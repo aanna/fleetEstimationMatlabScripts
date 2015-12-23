@@ -9,7 +9,7 @@ close all; clear; clc;
 % get the estimated arrival time of each trip
 %% Read files
 % booking file
-bookingFile = sprintf('arrivalTimes_ecbd.txt');
+bookingFile = sprintf('trips_withTTfor21stations.txt');
 bookingData = dlmread(bookingFile, ' ', 0, 0);
 
 origX = bookingData(:,1);
@@ -36,11 +36,11 @@ maxN_cust15mins = max(hist(bookingTime, 24*4));
 maxN_cust1hr = max(hist(bookingTime, 24));
 
 %% Outgoing trips
-rebalancing_period = 30*60; % #mins in seconds
+rebalancing_period = 15*60; % #mins in seconds
 dayLength = 60*60*24; % 24hrs in seconds
 n_periods = ceil(dayLength/rebalancing_period); %number of reb periods
 % trips count at each station and every time interval
-trips_count = zeros(ceil(dayLength/rebalancing_period), length(stationX));
+trips_count = zeros(n_periods, length(stationX));
 
 % find the nearest station for every origin
 Dist_matrix_orig = pdist2([origX(:), origY(:)], [stationX(:), stationY(:)]);
@@ -123,3 +123,28 @@ fileTOSave_dest = sprintf('destCounts_reb%d_stations%d_updated.txt', rebalancing
 delimiter = ' ';
 dlmwrite(fileTOSave_dest, counter_dest, delimiter);
 
+%% generate a matrix of trips for each interval
+% change coordinates for the station number
+
+% find the nearest station for each origin and destiantion
+origX = bookingData(:,1);
+origY = bookingData(:,2);
+destX = bookingData(:,3);
+destY = bookingData(:,4);
+bookingTime = bookingData(:,5);
+arrivalTime = bookingData(:,6);
+
+closestStO = zeros(length(origX), 1);
+closestStD = zeros(length(destX), 1);
+for i = 1:length(origX)
+    [o_distance, o_closestStationID ] = min(pdist2([origX(i,:), origY(i,:)], [stationX(:), stationY(:)]));
+    [d_distance, d_closestStationID ] = min(pdist2([destX(i,:), destY(i,:)], [stationX(:), stationY(:)]));
+    closestStO(i) = o_closestStationID;
+    closestStD(i) = d_closestStationID;
+end
+
+new_bookings = [closestStO, closestStD, bookingTime, int32(arrivalTime)];
+
+newBooking_f = sprintf('tripsAggregatedBy%dStation.txt', length(f_ids));
+delimiter = ' ';
+dlmwrite(newBooking_f, new_bookings, delimiter);
