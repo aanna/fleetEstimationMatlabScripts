@@ -116,9 +116,16 @@ end
 bookings_wATT = [int32(bookingTime), origX, origY, destX, destY, int32(traveltime), int32(arrivalTime)];
 %% Save to file
 disp('6. Save bookings with travel time...')
-delimiter = ' ';
+
 trips_ArrivalAndTT = sprintf('trips_ArrivalAndTT%dstations2016-03-21.txt', length(f_ids));
-dlmwrite(trips_ArrivalAndTT, bookings_wATT, delimiter);
+fileArrivals = fopen(trips_ArrivalAndTT,'w');
+
+for j = 1:length(bookingTime)
+    fprintf(fileArrivals,'%0u %f %f %f %f %0u %0u\n', bookingTime(j), origX(j), origY(j), destX(j), destY(j), traveltime(j), arrivalTime(j));
+end
+fclose(fileArrivals);
+
+disp('All done.')
 
 %% trips between the stations only
 % find the nearest station for each origin and destiantion
@@ -138,10 +145,9 @@ for i = 1:length(origX)
     end
 end
 
+ind_delete = find(ind_delete); % non zero indx 
 % delete empty rows
-ind_delete = find(ind_delete);
-
-closestStO(ind_delete) = []; % non zero indx 
+closestStO(ind_delete) = []; 
 closestStD(ind_delete) = [];
 bookingTime(ind_delete) = [];
 traveltime(ind_delete) = [];
