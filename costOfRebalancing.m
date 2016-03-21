@@ -8,22 +8,23 @@ close all; clear; clc;
 
 %% Read file
 % station file
-facilityFile = sprintf('inputDemand/ecbd_stations21.txt');
+facilityFile = sprintf('/Users/katarzyna/Dropbox/matlab/2016-03-Demand_generation/facility_location/stations_ecbd34.txt');
 stationsData = dlmread(facilityFile, ' ', 0, 0);
 
 f_ids = stationsData(:,1);
 stationX = stationsData(:,2);
 stationY = stationsData(:,3);
 
-Dist_matrix = pdist2([stationX(:), stationY(:)], [stationX(:), stationY(:)]);
+dist_factor = 1.37; % adjustment for euclidean dist, based on Spieser2014
+Dist_matrix = dist_factor * pdist2([stationX(:), stationY(:)], [stationX(:), stationY(:)]);
 
 %% Save to file
-fileTOSave = sprintf('costMatrixForRebalancingBetween%dStations.txt', length(stationX));
+fileTOSave = sprintf('distance%dStations.txt', length(stationX));
 delimiter = ' ';
 dlmwrite(fileTOSave, Dist_matrix, delimiter);
 
 %% Cost based on the travel time
-ave_tt = 22; % km/h
+ave_tt = 32; % km/h
 ave_tt_ms = ave_tt * 1000/3600;
 tt_matrix = zeros(length(Dist_matrix));
 for i = 1: length(Dist_matrix)
