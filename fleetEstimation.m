@@ -9,7 +9,8 @@ close all; clear; clc;
 % get the estimated arrival time of each trip
 %% Read files
 % booking file
-bookingFile = sprintf('trips_withTTfor21stations.txt');
+disp('1. Import trips between stations...')
+bookingFile = sprintf('tripsBetween34Station2016-03-17.txt');
 bookingData = dlmread(bookingFile, ' ', 0, 0);
 
 origX = bookingData(:,1);
@@ -17,7 +18,8 @@ origY = bookingData(:,2);
 bookingTime = bookingData(:,5);
 
 % station file
-facilityFile = sprintf('inputDemand/ecbd_stations21.txt');
+disp('2. Import stations...')
+facilityFile = sprintf('/home/kasia/Dropbox/matlab/2016-03-Demand_generation/facility_location/stations_ecbd34.txt');
 
 stationsData = dlmread(facilityFile, ' ', 0, 0);
 
@@ -25,8 +27,8 @@ f_ids = stationsData(:,1);
 stationX = stationsData(:,2);
 stationY = stationsData(:,3);
 
-%% show the graph for all the trips every deltaT (histogram)
-
+%% show graph for all the trips every deltaT (histogram)
+disp('3. Plot histogram for all trips...')
 figure()
 hist(bookingTime, 24*4);
 figure()
