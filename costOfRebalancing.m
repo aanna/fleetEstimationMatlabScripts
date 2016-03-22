@@ -8,7 +8,12 @@ close all; clear; clc;
 
 %% Read file
 % station file
-facilityFile = sprintf('/Users/katarzyna/Dropbox/matlab/2016-03-Demand_generation/facility_location/stations_ecbd34.txt');
+mac = false;
+if (~mac)
+    facilityFile = sprintf('/home/kasia/Dropbox/matlab/2016-03-Demand_generation/facility_location/stations_ecbd34.txt');
+else
+    facilityFile = sprintf('/Users/katarzyna/Dropbox/matlab/2016-03-Demand_generation/facility_location/stations_ecbd34.txt');
+end
 stationsData = dlmread(facilityFile, ' ', 0, 0);
 
 f_ids = stationsData(:,1);
@@ -30,7 +35,7 @@ tt_matrix = zeros(length(Dist_matrix));
 for i = 1: length(Dist_matrix)
     for j = 1: length(Dist_matrix)
         dist_temp = Dist_matrix(i,j);
-        tt_matrix(i,j) = Dist_matrix(i,j) / ave_tt_ms;
+        tt_matrix(i,j) = round(Dist_matrix(i,j) / ave_tt_ms);
     end
 end
 
