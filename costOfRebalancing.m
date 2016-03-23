@@ -1,6 +1,6 @@
 close all; clear; clc;
 %% Cost for traveling between stations
-% cost of rebalancing
+% cost of rebalancing, travel time is represented in secs
 % tt_matrix stores travel time for all trips between i and j
 % travel time is in seconds
 % distance is in meters
@@ -40,6 +40,6 @@ for i = 1: length(Dist_matrix)
 end
 
 %% Save to file
-fileTime = sprintf('RebTime%dStations.txt', length(Dist_matrix));
+fileTime = sprintf('RebTimeInSecs%dStations.txt', length(Dist_matrix));
 delimiter = ' ';
 dlmwrite(fileTime, tt_matrix, delimiter);
