@@ -75,5 +75,4 @@ delimiter = ' ';
 dlmwrite(filenameC, reb_veh_m,  delimiter);
 
 
-
 disp('All done.')
