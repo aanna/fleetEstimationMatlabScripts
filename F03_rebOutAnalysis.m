@@ -2,6 +2,8 @@ close all; clear; clc;
 
 % have to provide as an input the number of stations and number of
 % rebalancing intervals (it can't be recognized from the output file)
+% new output file in format time, from_node, to_node, count
+
 n_stations = 34;
 n_reb_periods = 96;
 vec_for_reb = 1:n_stations*n_stations;
