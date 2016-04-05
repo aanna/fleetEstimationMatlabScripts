@@ -6,6 +6,7 @@ close all; clear; clc;
 
 n_stations = 34;
 n_reb_periods = 96;
+rebalancing_interval = 24*60*60/n_reb_periods; % in seconds
 vec_for_reb = 1:n_stations*n_stations;
 reb_matrix = transpose(reshape(vec_for_reb, [n_stations, n_stations]));
 
@@ -27,6 +28,16 @@ arrSt_orSt = dataArray{:, 4}; % same as above
 quantity = dataArray{:, 5};
 
 clearvars filename delimiter startRow formatSpec fileID dataArray ans;
+
+%% Import stations
+disp('2. Stations file...');
+facilityFile = sprintf('stations_ecbd34.txt');
+
+stationsData = dlmread(facilityFile, ' ', 0, 0);
+
+f_ids = stationsData(:,1);
+stationX = stationsData(:,2);
+stationY = stationsData(:,3);
 
 %% Generate 3 matrices
 disp('2. Generate 3 matrices...')
@@ -69,12 +80,24 @@ for i =1 : n_reb_periods
     reb_veh_per_interval(i,1) = sum(reb_veh_m(i,:));
 end
 
+%% Reformat output
+% to be in the format time, from, to, count
+% this file will be the input file for offline rebalancing in
+% amodController
+
+reb_time = 0; % (is it beginning or end of the interval???)
+
+
+
+
 %% Save to file
-disp('4. Save rebalancing counts for SimMobility...')
+disp('4. Save rebalancing counts version 1...')
 % the file will serve as an input for the simulation
 filenameC = sprintf('rebalancingCounts_ecbd_per%d_st%d.txt', n_reb_periods, n_stations);
 delimiter = ' ';
 dlmwrite(filenameC, reb_veh_m,  delimiter);
+
+disp('4. Save rebalancing counts version 1...')
 
 
 disp('All done.')
