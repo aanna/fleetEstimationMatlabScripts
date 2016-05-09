@@ -13,11 +13,13 @@ close all; clear; clc;
 % node_id, pos_x, pos_y
 
 % output:
+% file consisting of the number of trips originating and arriving at all
+% stations
 
 %% Read files
 % booking file
 disp('1. Import trips between stations...')
-bookingFile = sprintf('tripsBetween34Station2016-03-21.txt');
+bookingFile = sprintf('tripsBetween34Station2016-05-09.txt');
 bookingData = dlmread(bookingFile, ' ', 0, 0);
 
 booking_time = bookingData(:,1);
@@ -27,12 +29,10 @@ travel_time = bookingData(:,4);
 
 % station file
 disp('2. Import stations...')
-facilityFile = sprintf('/Users/katarzyna/Dropbox/matlab/2016-03-Demand_generation/facility_location/stations_ecbd34.txt');
+facilityFile = sprintf('stations_ecbd34.txt');
 stationsData = dlmread(facilityFile, ' ', 0, 0);
 
 f_ids = stationsData(:,1);
-stationX = stationsData(:,2);
-stationY = stationsData(:,3);
 
 %% show graph for all the trips every deltaT (histogram)
 disp('3. Plot histogram for all trips...')
@@ -45,12 +45,9 @@ hist(booking_time, 24); % histogram every hour
 % maxN_cust1hr = max(hist(bookingTime, 24));
 
 %% Find station ids and substitute them by the sequence number
+disp('4. Find station ids...')
 % sequence number is based on the order in the stations' file
 % this is to allow counting of departures and arrivals for each station
-indices = zeros(length(f_ids),1);
-for i = 1:length(f_ids)
-   indices(i) = i; 
-end
 
 origin_id = zeros(length(booking_time),1);
 dest_id = zeros(length(booking_time),1);
@@ -60,6 +57,7 @@ for i = 1: length(booking_time)
 end
 
 %% Departures and arrivals at each station
+disp('5. Number of departures and arrivals at each station...')
 rebalancing_period_start = 0;
 rebalancing_period_end = 15*60; % #mins in seconds
 reb_delta = rebalancing_period_end - rebalancing_period_start;
@@ -95,11 +93,13 @@ for i = 1: length(booking_time) %
 end
 
 %% Save to file
-
-fileTOSave_orig = sprintf('origCounts_rebEvery%d_stations%d.txt', reb_delta, length(stationX));
+disp('6. Save to file...')
+fileTOSave_orig = sprintf('origCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
 dlmwrite(fileTOSave_orig, counter_orig,  delimiter);
 
-fileTOSave_dest = sprintf('destCounts_rebEvery%d_stations%d.txt', reb_delta, length(stationX));
+fileTOSave_dest = sprintf('destCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
 dlmwrite(fileTOSave_dest, counter_dest, delimiter);
+
+disp('All done.')

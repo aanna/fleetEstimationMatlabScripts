@@ -133,8 +133,6 @@ for j = 1:length(bookingTime)
 end
 fclose(fileArrivals);
 
-disp('All done.')
-
 %% trips between the stations only
 % find the nearest station for each origin and destiantion
 disp('7. Find the nearest station for each origin and destiantion...')
@@ -180,7 +178,7 @@ disp('8. Save bookings between stations...')
 % delimiter = ' ';
 % dlmwrite(newBooking_f, new_bookings, 'precision','%0u', delimiter);
 
-newBooking_f = sprintf('tripsBetween%dStation2016-03-21.txt', length(f_ids));
+newBooking_f = sprintf('tripsBetween%dStation2016-05-09.txt', length(f_ids));
 fileBookings = fopen(newBooking_f,'w');
 
 for j = 1:length(bookingTime)
