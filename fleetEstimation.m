@@ -6,7 +6,7 @@ close all; clear; clc;
 % autonomous mobility on demand system.
 %
 % input1: trips between station in the following format:
-% request_time_sec, origin_station (node_id), destination_station (node_id), 
+% request_time_sec, origin_station (node_id), destination_station (node_id),
 % traveltime, arrivalTime
 
 % input2: stations in the format:
@@ -38,8 +38,8 @@ f_ids = stationsData(:,1);
 disp('3. Plot histogram for all trips...')
 figure()
 hist(booking_time, 24*4); % histogram every 15 mins
-figure()
-hist(booking_time, 24); % histogram every hour
+% figure()
+% hist(booking_time, 24); % histogram every hour
 
 % maxN_cust15mins = max(hist(bookingTime, 24*4));
 % maxN_cust1hr = max(hist(bookingTime, 24));
@@ -74,22 +74,54 @@ end
 current_period = 1;
 counter_orig = zeros(n_periods, length(f_ids));
 counter_dest = zeros(n_periods, length(f_ids));
-for i = 1: length(booking_time) % 
-    % we are in the rebalancing interval
-    if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))   
+
+for i = 1: length(booking_time) %
+    % check if we are in the rebalancing interval
+    % this causes problem because if this is not true then we skip that
+    % line which should not happen
+    if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
         counter_orig (current_period, origin_id(i)) = counter_orig (current_period, origin_id(i)) + 1;
+        
+        % rem(current_period + travel_time_(i), n_periods) returns the time
+        % period when the vehicle will arrive at destination. It is
+        % reminder because, i.e., when the trip starts at the end of the
+        % day then it may arrive at the beginning of the next day. If the
+        % rem is zero then we are at the last period.
+        
         if (rem(current_period + travel_time_(i), n_periods) ~= 0)
-            counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) + 1; 
+            counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) + 1;
         else
             counter_dest (n_periods, dest_id(i)) = counter_dest (n_periods, dest_id(i)) + 1;
         end
-    end
-    
-    if (booking_time(i) > rebalancing_period_end)
+        
+    elseif (booking_time(i) >= rebalancing_period_end)
+        
+        % this is to prevent skipping the first line which does not
+        % satisfy the above condition
+        counter_orig (current_period + 1, origin_id(i)) = counter_orig (current_period + 1, origin_id(i)) + 1;
+       
+        if (rem(current_period + 1 + travel_time_(i), n_periods) ~= 0)
+            counter_dest (rem(current_period + 1 + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + 1 + travel_time_(i), n_periods), dest_id(i)) + 1;
+        else
+            counter_dest (n_periods, dest_id(i)) = counter_dest (n_periods, dest_id(i)) + 1;
+        end
+        
+        % update the indices
         rebalancing_period_start = rebalancing_period_end;
         rebalancing_period_end = rebalancing_period_end + reb_delta;
-        current_period = floor(booking_time(i)/reb_delta) + 1;    
+        current_period = current_period + 1;
     end
+    
+end
+
+%% check if the sum of origins and destinations is correct
+sum_origins = sum(counter_orig(:));
+sum_dest = sum(counter_dest(:));
+
+if (sum_origins == sum_dest)
+    disp('CORRECT: sum_origins == sum_dest')
+else
+    disp('WRONG: sum_origins ~= sum_dest')
 end
 
 %% Save to file
