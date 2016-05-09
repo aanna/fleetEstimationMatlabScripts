@@ -3,8 +3,14 @@ close all; clear; clc;
 % for the offile rebalancing policy
 
 % given the demand, travel cost matrix and station locations, the script
-% aims to find the estimated arrival time for each customer plus the extra
-% time needed for the vehicle to return to the station
+% aims to find the estimated arrival time for each customer
+
+% the file estimates the number of trips between stations and travel
+% time of these trips 
+% The waiting time is considered in calculation of travel time.
+% Additionally if we consider trips as journeys between stations only then
+% we add a 1.2 factor to account for the last leg of the trip which is
+% destination to carpark.
 
 % input: booking file in format: 
 % booking_id, booking_time, customer_id, origin_x, origin_y, destination_x, destination_y 
@@ -92,8 +98,7 @@ end
 
 % waiting time is gamma distributed with a = 2 and b = 4;
 % R = gamrnd(A,B) generates random numbers from the gamma distribution 
-% with shape parameters in A and scale parameters in B. When 
-% A controls the shape of the distribution. 
+% with shape parameters in A and scale parameters in B. 
 % If A is restricted to integers, the gamma distribution is referred to as 
 % the Erlang distribution used in queueing theory. A = 1 -> equivalent to
 % exponential distribution

@@ -42,10 +42,10 @@ stationY = stationsData(:,3);
 %% Generate 3 matrices
 disp('2. Generate 3 matrices...')
 % 1) vehicles available at each station for all time intervals
-available_veh = (strcmp(var_name,'vhs_st_i'));
+available_veh = (strcmp(var_name,'v_tii'));
 available_veh_m = zeros(n_reb_periods, n_stations);
 % 2) rebalancing counts between stations for all time intervals
-reb_veh = (strcmp(var_name,'nEmptyVhsTime'));
+reb_veh = (strcmp(var_name,'r_tij'));
 reb_veh_m = zeros(n_reb_periods, n_stations*n_stations);
 % 3) moving vehicles for all time intervals
 veh_in_transit = (strcmp(var_name,'in_transit'));
