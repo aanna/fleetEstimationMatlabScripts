@@ -96,14 +96,17 @@ end
 % arrival time = request time + waiting time + travel time
 % travel time = distance travelled*ave_speed
 
-% waiting time is gamma distributed with a = 2 and b = 4;
+% waiting time is gamma distributed with a = 6 and b = 1;
 % R = gamrnd(A,B) generates random numbers from the gamma distribution 
-% with shape parameters in A and scale parameters in B. 
+% with shape parameters in A and scale parameters in B. A is the mean
+% waiting time until the first event, B is the number of events for which
+% you are waiting to occur.
 % If A is restricted to integers, the gamma distribution is referred to as 
 % the Erlang distribution used in queueing theory. A = 1 -> equivalent to
 % exponential distribution
 % B controls the scale of the data. When it becomes large, the gamma 
 % distribution approaches the normal distribution.
+% 
 
 % speed is normally distributed with mean = 28.9 km/h (8.02 m/s) and
 % st.dev = 10 km/h (2.78 m/s) and minimum speed is 3m/s (10.08 km/h)
@@ -111,10 +114,10 @@ end
 disp('5. Calculate travel time...')
 for i = 1:length(origX)
     
-    waiting_time = gamrnd(2,4);
+    waiting_time = gamrnd(6,1); % in minutes
     speed_distr = normrnd(8.02, 2.78);
     speed = max(3, speed_distr);
-    arrivalTime(i) = bookingTime(i) + O2Ddistance(i)/speed + waiting_time;
+    arrivalTime(i) = bookingTime(i) + O2Ddistance(i)/speed + waiting_time*60;
     traveltime(i) = O2Ddistance(i)/speed;
 end
 
