@@ -1,20 +1,16 @@
 close all; clear; clc;
 
 %% Count number of people waiting at each station for every interval
-% Given the trip data file consisting on trips origin, destination and time
-% of the beginning of the trip find how many cars do we need to run
-% autonomous mobility on demand system.
+% Given the trip data file consisting on trips origin, destination, booking
+% time and arrival time, under the assumption that everyone is served
+% within the interval when booking arrived
 %
-% input1: trips between station in the following format:
-% request_time_sec, origin_station (node_id), destination_station (node_id),
+% input: trips between station in the following format:
+% request_time_sec, origin_station (node_id), destination_station (node_id), 
 % traveltime, arrivalTime
 
-% input2: stations in the format:
-% node_id, pos_x, pos_y
-
 % output:
-% file consisting of the number of trips originating and arriving at all
-% stations
+% file consisting of the number of vehicles travelling now to each station
 
 %% Read files
 % booking file
@@ -33,7 +29,6 @@ facilityFile = sprintf('stations_ecbd34.txt');
 stationsData = dlmread(facilityFile, ' ', 0, 0);
 
 f_ids = stationsData(:,1);
-
 %% show graph for all the trips every deltaT (histogram)
 disp('3. Plot histogram for all trips...')
 figure()
@@ -113,19 +108,8 @@ for i = 1: length(booking_time) %
     end
     
 end
-
-%% check if the sum of origins and destinations is correct
-sum_origins = sum(counter_orig(:));
-sum_dest = sum(counter_dest(:));
-
-if (sum_origins == sum_dest && sum_origins == length(booking_time))
-    disp('CORRECT: sum_origins == sum_dest && sum_origins == length(booking_time)')
-else
-    disp('WRONG: sum_origins ~= sum_dest || sum_origins ~= length(booking_time)')
-end
-
 %% Save to file
-disp('6. Save to file...')
+
 fileTOSave_orig = sprintf('origCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
 dlmwrite(fileTOSave_orig, counter_orig,  delimiter);
@@ -133,5 +117,3 @@ dlmwrite(fileTOSave_orig, counter_orig,  delimiter);
 fileTOSave_dest = sprintf('destCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
 dlmwrite(fileTOSave_dest, counter_dest, delimiter);
-
-disp('All done.')
