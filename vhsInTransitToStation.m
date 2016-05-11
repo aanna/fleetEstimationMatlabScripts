@@ -30,7 +30,7 @@ stationsData = dlmread(facilityFile, ' ', 0, 0);
 
 f_ids = stationsData(:,1);
 %% Find station ids and substitute them by the sequence number
-disp('4. Find station ids...')
+disp('3. Find station ids...')
 % sequence number is based on the order in the stations' file
 % this is to allow counting of departures and arrivals for each station
 
@@ -42,7 +42,7 @@ for i = 1: length(booking_time)
 end
 
 %% Departures and arrivals at each station
-disp('5. Number of departures and arrivals at each station...')
+disp('4. Number of vhs in transit to all stations...')
 rebalancing_period_start = 0;
 rebalancing_period_end = 15*60; % #mins in seconds
 reb_delta = rebalancing_period_end - rebalancing_period_start;
@@ -57,7 +57,6 @@ end
 
 % number of departures and arrivals at each station
 current_period = 1;
-arriving_dest = zeros(n_periods, length(f_ids));
 in_transit = zeros(n_periods, length(f_ids));
 
 for i = 1: length(booking_time) %
@@ -66,22 +65,28 @@ for i = 1: length(booking_time) %
     % line which should not happen
     if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
         
-        if (travel_time_(i) > 1)
-            for j = 1 : travel_time_(i)
-                in_transit (current_period + j - 1, dest_id(i)) = in_transit (current_period + j - 1, dest_id(i)) + 1;
+        if (travel_time_(i) > 1) % at least 2 time intervals so it is missing in the simulation for one period
+            for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
+                if (j + current_period <= n_periods)
+                    in_transit (current_period + j, dest_id(i)) = in_transit (current_period + j, dest_id(i)) + 1;
+                else
+                    % (travel_time_(i) + current_period -1 > n_periods)
+                    in_transit (current_period + j - n_periods, dest_id(i)) = in_transit (current_period + j - n_periods, dest_id(i)) + 1;
+                end
             end
-        else
-            % do nothing
         end
         
     elseif (booking_time(i) >= rebalancing_period_end)
         
-        if (travel_time_(i) > 1)
-            for j = 1 : travel_time_(i)
-                in_transit (current_period + j, dest_id(i)) = in_transit (current_period + j, dest_id(i)) + 1;
+        if (travel_time_(i) > 1) % at least 2 time intervals so it is missing in the simulation for one period
+            for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
+                if (j + current_period + 1 <= n_periods)
+                    in_transit (current_period + 1 + j, dest_id(i)) = in_transit (current_period + 1 + j, dest_id(i)) + 1;
+                else
+                    % (travel_time_(i) + current_period -1 > n_periods)
+                    in_transit (current_period + 1 + j - n_periods, dest_id(i)) = in_transit (current_period + 1 + j - n_periods, dest_id(i)) + 1;
+                end
             end
-        else
-            % do nothing
         end
         
         % update the indices
@@ -92,10 +97,10 @@ for i = 1: length(booking_time) %
     
 end
 
-still_in_transit = in_transit - arriving_dest;
-
 %% Save to file
-
+disp('5. Saving to file...')
 fileTOSave_dest = sprintf('inTransit%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
-dlmwrite(fileTOSave_dest, arriving_dest, delimiter);
+dlmwrite(fileTOSave_dest, in_transit, delimiter);
+
+disp('Done.')
