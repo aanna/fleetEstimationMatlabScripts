@@ -6,7 +6,7 @@ close all; clear; clc;
 % within the interval when booking arrived
 %
 % input: trips between station in the following format:
-% request_time_sec, origin_station (node_id), destination_station (node_id), 
+% request_time_sec, origin_station (node_id), destination_station (node_id),
 % traveltime, arrivalTime
 
 % output:
@@ -29,16 +29,6 @@ facilityFile = sprintf('stations_ecbd34.txt');
 stationsData = dlmread(facilityFile, ' ', 0, 0);
 
 f_ids = stationsData(:,1);
-%% show graph for all the trips every deltaT (histogram)
-disp('3. Plot histogram for all trips...')
-figure()
-hist(booking_time, 24*4); % histogram every 15 mins
-% figure()
-% hist(booking_time, 24); % histogram every hour
-
-% maxN_cust15mins = max(hist(bookingTime, 24*4));
-% maxN_cust1hr = max(hist(bookingTime, 24));
-
 %% Find station ids and substitute them by the sequence number
 disp('4. Find station ids...')
 % sequence number is based on the order in the stations' file
@@ -67,38 +57,31 @@ end
 
 % number of departures and arrivals at each station
 current_period = 1;
-counter_orig = zeros(n_periods, length(f_ids));
-counter_dest = zeros(n_periods, length(f_ids));
+arriving_dest = zeros(n_periods, length(f_ids));
+in_transit = zeros(n_periods, length(f_ids));
 
 for i = 1: length(booking_time) %
     % check if we are in the rebalancing interval
     % this causes problem because if this is not true then we skip that
     % line which should not happen
     if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
-        counter_orig (current_period, origin_id(i)) = counter_orig (current_period, origin_id(i)) + 1;
         
-        % rem(current_period + travel_time_(i), n_periods) returns the time
-        % period when the vehicle will arrive at destination. It is
-        % reminder because, i.e., when the trip starts at the end of the
-        % day then it may arrive at the beginning of the next day. If the
-        % rem is zero then we are at the last period.
-        
-        if (rem(current_period + travel_time_(i), n_periods) ~= 0)
-            counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) + 1;
+        if (travel_time_(i) > 1)
+            for j = 1 : travel_time_(i)
+                in_transit (current_period + j - 1, dest_id(i)) = in_transit (current_period + j - 1, dest_id(i)) + 1;
+            end
         else
-            counter_dest (n_periods, dest_id(i)) = counter_dest (n_periods, dest_id(i)) + 1;
+            % do nothing
         end
         
     elseif (booking_time(i) >= rebalancing_period_end)
         
-        % this is to prevent skipping the first line which does not
-        % satisfy the above condition
-        counter_orig (current_period + 1, origin_id(i)) = counter_orig (current_period + 1, origin_id(i)) + 1;
-       
-        if (rem(current_period + 1 + travel_time_(i), n_periods) ~= 0)
-            counter_dest (rem(current_period + 1 + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + 1 + travel_time_(i), n_periods), dest_id(i)) + 1;
+        if (travel_time_(i) > 1)
+            for j = 1 : travel_time_(i)
+                in_transit (current_period + j, dest_id(i)) = in_transit (current_period + j, dest_id(i)) + 1;
+            end
         else
-            counter_dest (n_periods, dest_id(i)) = counter_dest (n_periods, dest_id(i)) + 1;
+            % do nothing
         end
         
         % update the indices
@@ -108,12 +91,11 @@ for i = 1: length(booking_time) %
     end
     
 end
+
+still_in_transit = in_transit - arriving_dest;
+
 %% Save to file
 
-fileTOSave_orig = sprintf('origCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
+fileTOSave_dest = sprintf('inTransit%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
-dlmwrite(fileTOSave_orig, counter_orig,  delimiter);
-
-fileTOSave_dest = sprintf('destCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
-delimiter = ' ';
-dlmwrite(fileTOSave_dest, counter_dest, delimiter);
+dlmwrite(fileTOSave_dest, arriving_dest, delimiter);
