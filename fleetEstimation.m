@@ -99,7 +99,7 @@ for i = 1: length(booking_time) %
         % this is to prevent skipping the first line which does not
         % satisfy the above condition
         counter_orig (current_period + 1, origin_id(i)) = counter_orig (current_period + 1, origin_id(i)) + 1;
-       
+        
         if (rem(current_period + 1 + travel_time_(i), n_periods) ~= 0)
             counter_dest (rem(current_period + 1 + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + 1 + travel_time_(i), n_periods), dest_id(i)) + 1;
         else
@@ -133,5 +133,89 @@ dlmwrite(fileTOSave_orig, counter_orig,  delimiter);
 fileTOSave_dest = sprintf('destCounts_rebEvery%d_stations%d.txt', reb_delta, length(f_ids));
 delimiter = ' ';
 dlmwrite(fileTOSave_dest, counter_dest, delimiter);
+
+%% number of vehicles in transit at each period of time
+disp('7. Number of vehicles in transit at each period of time...')
+current_period = 1;
+in_transit = zeros(n_periods, length(f_ids));
+
+for i = 1: length(booking_time) %
+    % check if we are in the rebalancing interval
+    % this causes problem because if this is not true then we skip that
+    % line which should not happen
+    if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
+        
+        if (travel_time_(i) > 1) % at least 2 time intervals so it is missing in the simulation for one period
+            for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
+                if (j + current_period <= n_periods)
+                    in_transit (current_period + j, dest_id(i)) = in_transit (current_period + j, dest_id(i)) + 1;
+                else
+                    % (travel_time_(i) + current_period -1 > n_periods)
+                    in_transit (current_period + j - n_periods, dest_id(i)) = in_transit (current_period + j - n_periods, dest_id(i)) + 1;
+                end
+            end
+        end
+        
+    elseif (booking_time(i) >= rebalancing_period_end)
+        
+        if (travel_time_(i) > 1) % at least 2 time intervals so it is missing in the simulation for one period
+            for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
+                if (j + current_period + 1 <= n_periods)
+                    in_transit (current_period + 1 + j, dest_id(i)) = in_transit (current_period + 1 + j, dest_id(i)) + 1;
+                else
+                    % (travel_time_(i) + current_period -1 > n_periods)
+                    in_transit (current_period + 1 + j - n_periods, dest_id(i)) = in_transit (current_period + 1 + j - n_periods, dest_id(i)) + 1;
+                end
+            end
+        end
+        
+        % update the indices
+        rebalancing_period_start = rebalancing_period_end;
+        rebalancing_period_end = rebalancing_period_end + reb_delta;
+        current_period = current_period + 1;
+    end
+    
+end
+
+%% sum of arrivals + departures + in_transit at each time step
+disp('8. Sum of arrivals + departures + in_transit at each time step...')
+total_vehicles = zeros(n_periods, 1);
+for i = 1: length(total_vehicles)
+    
+    total_vehicles(i) = sum(in_transit(i,:)) + sum(counter_orig(i,:)) + sum(counter_dest(i,:));
+    
+end
+
+% check
+disp('9. Checking number of vehicles at every interval...')
+
+for i = 1: length(total_vehicles)
+    
+    if (i < length(total_vehicles))
+
+        if (total_vehicles(i) ~= total_vehicles(i + 1))
+            X = sprintf('NOT EQUAL!: %d != %d', total_vehicles(i), total_vehicles(i + 1));
+            disp(X)
+        else
+            X = sprintf('EQUAL!: %d == %d', total_vehicles(i), total_vehicles(i + 1));
+            disp(X)
+        end
+    else
+
+        if (total_vehicles(i) ~= total_vehicles(1))
+            X = sprintf('NOT EQUAL!: %d != %d', total_vehicles(i), total_vehicles(1));
+            disp(X)
+        else
+            X = sprintf('EQUAL!: %d == %d', total_vehicles(i), total_vehicles(1));
+            disp(X)
+        end
+    end
+end
+
+%% Save to file
+disp('10. Saving to file...')
+fileTOSave_transit = sprintf('inTransit%d_stations%d.txt', reb_delta, length(f_ids));
+delimiter = ' ';
+dlmwrite(fileTOSave_transit, in_transit, delimiter);
 
 disp('All done.')
