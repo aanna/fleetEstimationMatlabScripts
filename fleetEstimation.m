@@ -145,7 +145,7 @@ for i = 1: length(booking_time) %
     % line which should not happen
     if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
         
-        if (travel_time_(i) > 1) % at least 2 time intervals so it is missing in the simulation for one period
+        if (travel_time_(i) > 1) % at least 2 time intervals so the vehicle is missing in the simulation for at least one period
             for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
                 if (j + current_period <= n_periods)
                     in_transit (current_period + j, dest_id(i)) = in_transit (current_period + j, dest_id(i)) + 1;
@@ -214,7 +214,7 @@ end
 
 %% Save to file
 disp('10. Saving to file...')
-fileTOSave_transit = sprintf('inTransit%d_stations%d.txt', reb_delta, length(f_ids));
+fileTOSave_transit = sprintf('inTransitReb%dStations%d%.txt', reb_delta, length(f_ids));
 delimiter = ' ';
 dlmwrite(fileTOSave_transit, in_transit, delimiter);
 
