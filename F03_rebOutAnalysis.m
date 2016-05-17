@@ -1,29 +1,21 @@
 close all; clear; clc;
 
 % input files:
-% new output file in format time, from_node, to_node, count
-
-simple_model = false;
-
-if (simple_model)
-    n_stations = 3;
-    n_reb_periods = 3;
-    rebalancing_interval = 1;
-    vec_for_reb = 1:n_stations*n_stations;
-    reb_matrix = transpose(reshape(vec_for_reb, [n_stations, n_stations]));
-else
-    n_stations = 34;
-    n_reb_periods = 96;
-    rebalancing_interval = 24*60*60/n_reb_periods; % in seconds
-    vec_for_reb = 1:n_stations*n_stations;
-    reb_matrix = transpose(reshape(vec_for_reb, [n_stations, n_stations]));
-end
-
-% input files:
+% gurobi output file, file automatically generated b Gurobi
 gurobi_out = sprintf('/home/kasia/Documents/rebalancing_cpp/rebalancingMethods/rebalancing_offline/rebalancing_solution_simple.sol');
+% counts of origins at each station at each rebalancing interval
+% size: matrix n_rebalancing_intervals x nstations
 originFile = sprintf('origCounts_rebEvery900_stations34.txt');
+% destination counts at each station at each rebalancing interval
+% size: matrix n_rebalancing_intervals x nstations
 destFile = sprintf('destCounts_rebEvery900_stations34.txt');
+% facility file: facility_id, posX, posY; every line is a new facility
 facilityFile = sprintf('stations_ecbd34.txt');
+% vehicles in transit, matrix n_rebalancing_intervals x nstations
+intransitFile = sprintf('inTransit900_stations34.txt');
+
+% output files:
+
 
 %% Import output from Gurobi cpp
 disp('1. Import output from Gurobi cpp...')
@@ -41,18 +33,18 @@ GRB_depSt_orSt = dataArray{:, 3}; % depending on thr var_name, i.e., if reb_veh
 GRB_arrSt_orSt = dataArray{:, 4}; % same as above
 GRBSOL_quantity = dataArray{:, 5};
 
-clearvars filename delimiter startRow formatSpec fileID dataArray ans;
+clearvars gurobi_out delimiter startRow formatSpec fileID dataArray ans;
 
 %% Import stations
-disp('2. Stations file...');
-stationsData = dlmread(facilityFile, ' ', 0, 0);
-
-f_ids = stationsData(:,1);
-stationX = stationsData(:,2);
-stationY = stationsData(:,3);
+% disp('2. Stations file...');
+% stationsData = dlmread(facilityFile, ' ', 0, 0);
+% 
+% f_ids = stationsData(:,1);
+% stationX = stationsData(:,2);
+% stationY = stationsData(:,3);
 
 %% Import trips data - origin counts
-disp('3. Origin and destination counts from files...');
+disp('3. Origin destination and in_transit counts from files...');
 % we do not know ahead how many columns (stations) and rows (intervals) is
 % in the file
 
@@ -62,11 +54,11 @@ originFile_ = fopen(originFile);
 % find number of columns in the file
 tline = fgetl(originFile_);
 fclose(originFile_); % have to close and open the file again to make sure that the first line is not skipped later
-N = length(find(tline==' ')) + 1;
+N_stations_orig = length(find(tline==' ')) + 1;
 
 % Keep track of the current state outside the loop:
-nrows = 0;     % Number of rows in current run
-origin_counts = zeros(1000, N);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
+nrows_orig = 0;     % Number of rows in current run
+origin_counts = zeros(1000, N_stations_orig);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
 % reopen the file
 originFile_ = fopen(originFile);
 
@@ -76,12 +68,12 @@ while ~feof(originFile_)
     row = textscan( current_line, '%u', 'delimiter', ' ' );
     row_double = cell2mat(row)';
     % Append the row to the current run data
-    nrows = nrows + 1; 
-    origin_counts(nrows,:) = row_double;
+    nrows_orig = nrows_orig + 1; 
+    origin_counts(nrows_orig,:) = row_double;
 end
 
 % Remove all rows from nrows until the end of matrix
-origin_counts = origin_counts(1:nrows,:);
+origin_counts = origin_counts(1:nrows_orig,:);
 
 %% Import trips data - destination counts
 % dest_counts; the same procedure as for origin_counts
@@ -89,11 +81,11 @@ destFile_ = fopen(destFile);
 % find number of columns in the file
 tline = fgetl(destFile_);
 fclose(destFile_); % have to close and open the file again to make sure that the first line is not skipped later
-N = length(find(tline==' ')) + 1;
+N_stations_dest = length(find(tline==' ')) + 1;
 
 % Keep track of the current state outside the loop:
-nrows = 0;     % Number of rows in current run
-dest_counts = zeros(1000, N);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
+nrows_dest = 0;     % Number of rows in current run
+dest_counts = zeros(1000, N_stations_dest);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
 % reopen the file
 destFile_ = fopen(destFile);
 
@@ -103,40 +95,91 @@ while ~feof(destFile_)
     row = textscan( current_line, '%u', 'delimiter', ' ' );
     row_double = cell2mat(row)';
     % Append the row to the current run data
-    nrows = nrows + 1; 
-    dest_counts(nrows,:) = row_double;
+    nrows_dest = nrows_dest + 1; 
+    dest_counts(nrows_dest,:) = row_double;
 end
 
 % Remove all rows from nrows until the end of matrix
-dest_counts = dest_counts(1:nrows,:);
+dest_counts = dest_counts(1:nrows_dest,:);
 
-%% Generate 3 matrices
-disp('4. Generate 3 matrices...')
+% check if N_stations_orig == N_stations_dest
+if (N_stations_orig == N_stations_orig && nrows_orig == nrows_dest)
+    disp('CORRECT: N_stations_orig == N_stations_dest && nrows_orig == nrows_dest')
+    % create a general variable N_stations
+    nstations =  N_stations_orig;
+    nrows = nrows_orig;
+    clearvars N_stations_orig N_stations_dest nrows_orig nrows_dest destFile_ destFile originFile_ originFile ;
+else
+    disp('WRONG: N_stations_orig != N_stations_dest or && nrows_orig != nrows_dest')
+end
+
+%% in transit counts
+% dest_counts; the same procedure as for origin_counts
+intransitFile_ = fopen(intransitFile);
+% find number of columns in the file
+tline = fgetl(intransitFile_);
+fclose(intransitFile_); % have to close and open the file again to make sure that the first line is not skipped later
+N_stations_intr = length(find(tline==' ')) + 1;
+
+% Keep track of the current state outside the loop:
+nrows_intr = 0;     % Number of rows in current run
+intransit_counts = zeros(1000, N_stations_intr);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
+% reopen the file
+intransitFile_ = fopen(intransitFile);
+
+while ~feof(intransitFile_)
+    current_line = fgetl(intransitFile_);
+    % Parse row of data from line
+    row = textscan( current_line, '%u', 'delimiter', ' ' );
+    row_double = cell2mat(row)';
+    % Append the row to the current run data
+    nrows_intr = nrows_intr + 1; 
+    intransit_counts(nrows_intr,:) = row_double;
+end
+
+% Remove all rows from nrows until the end of matrix
+intransit_counts = intransit_counts(1:nrows_intr,:);
+
+% check if N_stations_orig == N_stations_dest
+if (N_stations_intr == nstations && nrows == nrows_intr)
+    disp('CORRECT: N_stations_intr == nstations && nrows == nrows_intr')
+    % create a general variable N_stations
+    clearvars N_stations_intr nrows_intr intransitFile_ intransitFile;
+else
+    disp('WRONG: N_stations_intr != nstations && nrows == nrows_intr')
+end
+
+%% Read available vehicles and rebalancing counts
+disp('4. Read available vehicles and rebalancing counts...')
 % 1) vehicles available at each station for all time intervals
-available_veh = (strcmp(GRB_var_name,'v_ti'));
-available_veh_m = zeros(n_reb_periods, n_stations);
+% (strcmp(GRB_var_name,'v_ti')) returns 1 if GRB_var_name is equal to the
+% string, otherwise it returns zero
+idle_veh_ix = (strcmp(GRB_var_name,'v_ti'));
+available_veh_m = zeros(nrows, nstations);
 % 2) rebalancing counts between stations for all time intervals
 reb_veh = (strcmp(GRB_var_name,'r_tij'));
-reb_veh_m = zeros(n_reb_periods, n_stations*n_stations);
+reb_veh_m = zeros(nrows, nstations*nstations);
+
+% reb_matrix = transpose(reshape(vec_for_reb, [nstations, nstations]));
 
 for i =1 : length (GRB_var_name)
-    if (available_veh(i))
+    if (idle_veh_ix(i))
         available_veh_m(GRB_time(i)+1, GRB_arrSt_orSt(i)+1) = GRBSOL_quantity(i);
     end
     
-    if (reb_veh(i))
-        column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
-        reb_veh_m(GRB_time(i)+1, column_indx) = GRBSOL_quantity(i);
-    end
+%     if (reb_veh(i))
+%         column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+%         reb_veh_m(GRB_time(i)+1, column_indx) = GRBSOL_quantity(i);
+%     end
 end
 
 
 %% Analysis
 disp('3. Analysis...')
 % check if the number of vehicles is constant over the simulation
-total_vehicles = zeros(n_reb_periods, 1);
-available_veh_per_interval = zeros(n_reb_periods, 1);
-reb_veh_per_interval = zeros (n_reb_periods, 1);
+total_vehicles = zeros(nrows, 1);
+available_veh_per_interval = zeros(nrows, 1);
+reb_veh_per_interval = zeros (nrows, 1);
 
 for i =1 : n_reb_periods
     total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(veh_in_transit_m(i,:));
