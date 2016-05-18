@@ -5,18 +5,21 @@ close all; clear; clc;
 gurobi_out = sprintf('/home/kasia/Documents/rebalancing_cpp/rebalancingMethods/rebalancing_offline/rebalancing_solution_simple.sol');
 % counts of origins at each station at each rebalancing interval
 % size: matrix n_rebalancing_intervals x nstations
-originFile = sprintf('origCounts_rebEvery900_stations34.txt');
+originFile = sprintf('sampleFiles/origCounts3x3.txt');
 % destination counts at each station at each rebalancing interval
 % size: matrix n_rebalancing_intervals x nstations
-destFile = sprintf('destCounts_rebEvery900_stations34.txt');
+destFile = sprintf('sampleFiles/destCounts3x3.txt');
 % facility file: facility_id, posX, posY; every line is a new facility
-facilityFile = sprintf('stations_ecbd34.txt');
+%facilityFile = sprintf('stations_ecbd34.txt');
+facilityFile = sprintf('sampleFiles/stationsXY.txt');
 % vehicles in transit, matrix n_rebalancing_intervals x nstations
-intransitFile = sprintf('inTransit900_stations34.txt');
+%intransitFile = sprintf('inTransit900_stations34.txt');
+intransitFile = sprintf('sampleFiles/inTransit3x3.txt');
+% estimated travel cost for a trip between stations
+travelcostFile = sprintf('sampleFiles/costM3x3.txt');
 
 % rebalancing interval in seconds
-reb_interval = 900;
-
+reb_interval = 1;
 % output files:
 
 
@@ -47,7 +50,7 @@ stationX = stationsData(:,2);
 stationY = stationsData(:,3);
 
 %% Import trips data - origin counts
-disp('3. Origin, destination and in_transit counts from files...');
+disp('3. Origin counts, destination counts, in_transit counts and travel time from files...');
 % we do not know ahead how many columns (stations) and rows (intervals) is
 % in the file
 
@@ -152,6 +155,29 @@ else
     disp('WRONG: N_stations_intr != nstations && nrows == nrows_intr')
 end
 
+%% travel time between stations
+ttFile_ = fopen(travelcostFile);
+% find number of columns in the file
+tline = fgetl(ttFile_);
+fclose(ttFile_); % have to close and open the file again to make sure that the first line is not skipped later
+N_stations_tt = length(find(tline==' ')) + 1;
+
+% Keep track of the current state outside the loop:
+nrows_tt = 0;     % Number of rows in current run
+traveltimes = zeros(N_stations_tt, N_stations_tt);
+% reopen the file
+ttFile_ = fopen(travelcostFile);
+
+while ~feof(ttFile_)
+    current_line = fgetl(ttFile_);
+    % Parse row of data from line
+    row = textscan( current_line, '%u', 'delimiter', ' ' );
+    row_double = cell2mat(row)';
+    % Append the row to the current run data
+    nrows_tt = nrows_tt + 1;
+    traveltimes(nrows_tt,:) = row_double;
+end
+
 %% Sum available vehicles and rebalancing counts
 disp('4. Sum available vehicles and rebalancing counts...')
 
@@ -161,23 +187,34 @@ disp('4. Sum available vehicles and rebalancing counts...')
 idle_veh_ix = (strcmp(GRB_var_name,'v_ti'));
 available_veh_m = zeros(nrows, nstations);
 
-% 2) rebalancing counts between stations for all time intervals
+% 2) rebalancing departing counts between stations for all time intervals
 reb_veh = (strcmp(GRB_var_name,'r_tij'));
-reb_counts = zeros(nrows, nstations*nstations);
+reb_dep_counts = zeros(nrows, nstations*nstations);
+% rebalancing arriving counts between stations for all time intervals,
+% which is rebalancing_dep + travel time 
+reb_arr_counts = zeros(nrows, nstations*nstations);
 % to retrive and store rebalancing counts
 vec_for_reb = 1:nstations*nstations;
 reb_matrix = transpose(reshape(vec_for_reb, [nstations, nstations]));
 
 for i =1 : length (GRB_var_name)
     if (idle_veh_ix(i))
-        available_veh_m(GRB_time(i)+1, GRB_arrSt_orSt(i)+1) = GRBSOL_quantity(i);
+        available_veh_m(GRB_time(i)+1, GRB_depSt_orSt(i)+1) = GRBSOL_quantity(i);
     end
     
     if (reb_veh(i))
         column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
-        reb_counts(GRB_time(i)+1, column_indx) = GRBSOL_quantity(i);
+        reb_dep_counts(GRB_time(i) + 1, column_indx) = GRBSOL_quantity(i);
+        if (GRBSOL_quantity(i) > 0)
+            % shift the counts forward by travel time
+            tt = traveltimes(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+            arr_time = rem (GRB_time(i) + 1 + tt, nrows*reb_interval);
+            reb_arr_counts(arr_time, column_indx) = GRBSOL_quantity(i);
+        end
     end
 end
+
+% Add travel time to the reb_departure time
 
 %% Analysis
 disp('5. Check if the number of vehicles is constant over the simulation...')
@@ -187,7 +224,7 @@ available_veh_per_interval = zeros(nrows, 1);
 reb_veh_per_interval = zeros (nrows, 1);
 
 for i = 1 : nrows
-    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:) + sum(origin_counts(i,:)) + sum(reb_counts(i,:)));
+    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:));
     
     if (i > 1)
         if (total_vehicles(i) ~= total_vehicles(i - 1))
@@ -257,7 +294,7 @@ clearvars ans column_indx current_line dest_st destX destY facilityFile i j orig
 %% Save to file
 disp('7. Save rebalancing counts version 1...')
 % the file will serve as an input for the simulation
-filenameC = sprintf('rebalancingCounts_ecbd_per%d_st%d.txt', nrows, nstations);
+filenameC = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
 delimiter = ' ';
 dlmwrite(filenameC, rebalances_n2n,  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
 
