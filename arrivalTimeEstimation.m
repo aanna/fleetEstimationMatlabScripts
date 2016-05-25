@@ -94,7 +94,7 @@ end
 
 %% Calculate travel time and arrival time
 % arrival time = request time + waiting time + travel time
-% travel time = distance travelled*ave_speed
+% travel_time = distance_travelled / ave_speed
 
 % waiting time is gamma distributed with a = 6 and b = 1;
 % R = gamrnd(A,B) generates random numbers from the gamma distribution 

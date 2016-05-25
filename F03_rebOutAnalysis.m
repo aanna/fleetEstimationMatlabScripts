@@ -1,27 +1,52 @@
 close all; clear; clc;
 
+simple_model = false;
+
 % input files:
-% gurobi output file, file automatically generated b Gurobi
-gurobi_out = sprintf('/home/kasia/Documents/rebalancing_cpp/rebalancingMethods/rebalancing_offline/rebalancing_solution_simple.sol');
-% counts of origins at each station at each rebalancing interval
-% size: matrix n_rebalancing_intervals x nstations
-originFile = sprintf('sampleFiles/origCounts3x3.txt');
-% destination counts at each station at each rebalancing interval
-% size: matrix n_rebalancing_intervals x nstations
-destFile = sprintf('sampleFiles/destCounts3x3.txt');
-% facility file: facility_id, posX, posY; every line is a new facility
-%facilityFile = sprintf('stations_ecbd34.txt');
-facilityFile = sprintf('sampleFiles/stationsXY.txt');
-% vehicles in transit, matrix n_rebalancing_intervals x nstations
-%intransitFile = sprintf('inTransit900_stations34.txt');
-intransitFile = sprintf('sampleFiles/inTransit3x3.txt');
-% estimated travel cost for a trip between stations
-travelcostFile = sprintf('sampleFiles/costM3x3.txt');
+if (simple_model)
+    % gurobi output file, file automatically generated b Gurobi
+    gurobi_out = sprintf('/home/kasia/Documents/rebalancing_cpp/rebalancingMethods/rebalancing_offline/rebalancing_solution_simple.sol');
+    % counts of origins at each station at each rebalancing interval
+    % size: matrix n_rebalancing_intervals x nstations
+    originFile = sprintf('sampleFiles/origCounts3x3.txt');
+    % destination counts at each station at each rebalancing interval
+    % size: matrix n_rebalancing_intervals x nstations
+    destFile = sprintf('sampleFiles/destCounts3x3.txt');
+    % facility file: facility_id, posX, posY; every line is a new facility
+    facilityFile = sprintf('sampleFiles/stationsXY.txt');
+    % vehicles in transit, matrix n_rebalancing_intervals x nstations
+    intransitFile = sprintf('sampleFiles/inTransit3x3.txt');
+    % estimated travel cost for a trip between stations
+    travelcostFile = sprintf('sampleFiles/costM3x3.txt');
+    % rebalancing interval in seconds
+    reb_interval = 1; % 1 for sample files
+    
+else
+    % simMobility model
+    % gurobi output file, file automatically generated b Gurobi
+    gurobi_out = sprintf('/home/kasia/Documents/rebalancing_cpp/rebalancingMethods/rebalancing_offline/rebalancing_solution.sol');
+    % counts of origins at each station at each rebalancing interval
+    % size: matrix n_rebalancing_intervals x nstations
+    originFile = sprintf('origCounts_rebEvery900_stations34.txt');
+    % destination counts at each station at each rebalancing interval
+    % size: matrix n_rebalancing_intervals x nstations
+    destFile = sprintf('destCounts_rebEvery900_stations34.txt');
+    % facility file: facility_id, posX, posY; every line is a new facility
+    facilityFile = sprintf('stations_ecbd34.txt');
+    % vehicles in transit, matrix n_rebalancing_intervals x nstations
+    intransitFile = sprintf('inTransit900_stations34.txt');
+    % estimated travel cost for a trip between stations
+    travelcostFile = sprintf('RebTimeInSecs34Stations.txt');
+    % rebalancing interval in seconds
+    reb_interval = 900; % in seconds
+end
 
-% rebalancing interval in seconds
-reb_interval = 1;
+
 % output files:
-
+% possible 3 different output files for rebalancing input:
+% 1) time, from, to, count
+% or each trip separately
+% 2) time, from, to. From to can be as x and y or as a node_id
 
 %% Import output from Gurobi cpp
 disp('1. Import output from Gurobi cpp...')
@@ -191,7 +216,7 @@ available_veh_m = zeros(nrows, nstations);
 reb_veh = (strcmp(GRB_var_name,'r_tij'));
 reb_dep_counts = zeros(nrows, nstations*nstations);
 % rebalancing arriving counts between stations for all time intervals,
-% which is rebalancing_dep + travel time 
+% which is rebalancing_dep + travel time
 reb_arr_counts = zeros(nrows, nstations*nstations);
 % to retrive and store rebalancing counts
 vec_for_reb = 1:nstations*nstations;
@@ -248,12 +273,14 @@ end
 
 %% Reformat output
 disp('6. Reformat output...')
-% to be in the format time, from, to, count
+% to be in the format time, from, to, count (time is the time when vehicle
+% has to depart for destination)
 % this file will be the inputed in amodController
 
 rebalances_n2n = zeros(100000, 3); % preallocated space, line: time, node, node
 rebalances_xy2xy = zeros(100000, 5); % preallocated space, line: time, originX, originY, destX, destY
 rebalances_xy2xy_comb = zeros(100000, 6); % preallocated space, line: time, originX, originY, destX, destY, count
+rebalances_n2n_comb = zeros(100000, 4); % preallocated space, line: time, node, node, count
 index = 0;
 index_c = 0;
 % check for all rebalancing variables in the optimization output and write
@@ -282,20 +309,22 @@ for i = 1 : length (GRB_time)
         end
         index_c = index_c + 1;
         rebalances_xy2xy_comb(index_c, :) = [rebtime; originX; originY; destX; destY; GRBSOL_quantity(i)];
+        rebalances_n2n_comb(index_c, :) = [rebtime; origin_st; dest_st; GRBSOL_quantity(i)];
     end
 end
 
 rebalances_n2n = rebalances_n2n(1:index, :);
 rebalances_xy2xy = rebalances_xy2xy(1:index, :);
 rebalances_xy2xy_comb = rebalances_xy2xy_comb(1:index_c, :);
+rebalances_n2n_comb = rebalances_n2n_comb(1:index_c, :);
 
 clearvars ans column_indx current_line dest_st destX destY facilityFile i j originX originY origin_st row tline X;
 
 %% Save to file
 disp('7. Save rebalancing counts version 1...')
 % the file will serve as an input for the simulation
-filenameC = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
+filename_out = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
 delimiter = ' ';
-dlmwrite(filenameC, rebalances_n2n,  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
+dlmwrite(filename_out, rebalances_n2n_comb,  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
 
 disp('All done.')

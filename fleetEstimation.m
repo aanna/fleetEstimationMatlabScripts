@@ -137,6 +137,8 @@ dlmwrite(fileTOSave_dest, counter_dest, delimiter);
 %% number of vehicles in transit at each period of time
 disp('7. Number of vehicles in transit at each period of time...')
 current_period = 1;
+rebalancing_period_start = 0;
+rebalancing_period_end = 15*60; % #mins in seconds
 in_transit = zeros(n_periods, length(f_ids));
 
 for i = 1: length(booking_time) %
