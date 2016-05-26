@@ -67,7 +67,7 @@ n_periods = ceil(dayLength/rebalancing_period_end); %number of reb periods
 % Convert travel time to adjust for periods
 travel_time_ = zeros(length(booking_time),1);
 for i = 1: length(booking_time)
-    travel_time_(i) = floor(travel_time(i)/reb_delta) + 1;
+    travel_time_(i) = ceil(travel_time(i)/reb_delta);
 end
 
 % number of departures and arrivals at each station
@@ -77,8 +77,6 @@ counter_dest = zeros(n_periods, length(f_ids));
 
 for i = 1: length(booking_time) %
     % check if we are in the rebalancing interval
-    % this causes problem because if this is not true then we skip that
-    % line which should not happen
     if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
         counter_orig (current_period, origin_id(i)) = counter_orig (current_period, origin_id(i)) + 1;
         
@@ -91,11 +89,13 @@ for i = 1: length(booking_time) %
         if (rem(current_period + travel_time_(i), n_periods) ~= 0)
             counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) = counter_dest (rem(current_period + travel_time_(i), n_periods), dest_id(i)) + 1;
         else
+            % we are arriving in the last interval
             counter_dest (n_periods, dest_id(i)) = counter_dest (n_periods, dest_id(i)) + 1;
         end
         
-    elseif (booking_time(i) >= rebalancing_period_end)
-        
+        % elseif handles the line which does not satisfy the condition
+        % (otherwise it would be neglected)
+    elseif (booking_time(i) >= rebalancing_period_end)   
         % this is to prevent skipping the first line which does not
         % satisfy the above condition
         counter_orig (current_period + 1, origin_id(i)) = counter_orig (current_period + 1, origin_id(i)) + 1;
@@ -142,40 +142,13 @@ rebalancing_period_end = 15*60; % #mins in seconds
 in_transit = zeros(n_periods, length(f_ids));
 
 for i = 1: length(booking_time) %
-    % check if we are in the rebalancing interval
-    % this causes problem because if this is not true then we skip that
-    % line which should not happen
-    if ((booking_time(i) >= rebalancing_period_start) && (booking_time(i) < rebalancing_period_end))
-        
-        if (travel_time_(i) > 1) % at least 2 time intervals so the vehicle is missing in the simulation for at least one period
-            for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
-                if (j + current_period <= n_periods)
-                    in_transit (current_period + j, dest_id(i)) = in_transit (current_period + j, dest_id(i)) + 1;
-                else
-                    % (travel_time_(i) + current_period -1 > n_periods)
-                    in_transit (current_period + j - n_periods, dest_id(i)) = in_transit (current_period + j - n_periods, dest_id(i)) + 1;
-                end
-            end
+    
+    if (travel_time_(i) > 1) % at least 2 time intervals so the vehicle is missing in the simulation for at least one period
+        for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
+
         end
-        
-    elseif (booking_time(i) >= rebalancing_period_end)
-        
-        if (travel_time_(i) > 1) % at least 2 time intervals so it is missing in the simulation for one period
-            for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
-                if (j + current_period + 1 <= n_periods)
-                    in_transit (current_period + 1 + j, dest_id(i)) = in_transit (current_period + 1 + j, dest_id(i)) + 1;
-                else
-                    % (travel_time_(i) + current_period -1 > n_periods)
-                    in_transit (current_period + 1 + j - n_periods, dest_id(i)) = in_transit (current_period + 1 + j - n_periods, dest_id(i)) + 1;
-                end
-            end
-        end
-        
-        % update the indices
-        rebalancing_period_start = rebalancing_period_end;
-        rebalancing_period_end = rebalancing_period_end + reb_delta;
-        current_period = current_period + 1;
     end
+    
     
 end
 
