@@ -74,7 +74,7 @@ f_ids = stationsData(:,1);
 stationX = stationsData(:,2);
 stationY = stationsData(:,3);
 
-%% Import trips data - origin counts
+%% Import trips data -> origin counts
 disp('3. Origin counts, destination counts, in_transit counts and travel time from files...');
 % we do not know ahead how many columns (stations) and rows (intervals) is
 % in the file
@@ -106,7 +106,7 @@ end
 % Remove all rows from nrows until the end of matrix
 origin_counts = origin_counts(1:nrows_orig,:);
 
-%% Import trips data - destination counts
+%% Import trips data -> destination counts
 % dest_counts; the same procedure as for origin_counts
 destFile_ = fopen(destFile);
 % find number of columns in the file
@@ -144,7 +144,7 @@ else
     disp('WRONG: N_stations_orig != N_stations_dest or && nrows_orig != nrows_dest')
 end
 
-%% in transit counts
+%% Import trips data -> in transit counts
 % dest_counts; the same procedure as for origin_counts
 intransitFile_ = fopen(intransitFile);
 % find number of columns in the file
@@ -180,7 +180,7 @@ else
     disp('WRONG: N_stations_intr != nstations && nrows == nrows_intr')
 end
 
-%% travel time between stations
+%% Import travel time between stations
 ttFile_ = fopen(travelcostFile);
 % find number of columns in the file
 tline = fgetl(ttFile_);
@@ -241,12 +241,14 @@ end
 
 % Add travel time to the reb_departure time
 
+%% Find number of rebalancing vehs in transit to destination
+disp('5. Find number of rebalancing vehs in transit to destination...')
+
+
 %% Analysis
-disp('5. Check if the number of vehicles is constant over the simulation...')
+disp('6. Check if the number of vehicles is constant over the simulation...')
 % check if the number of vehicles is constant over the simulation
 total_vehicles = zeros(nrows, 1);
-available_veh_per_interval = zeros(nrows, 1);
-reb_veh_per_interval = zeros (nrows, 1);
 
 for i = 1 : nrows
     total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:));
@@ -272,7 +274,7 @@ if (total_vehicles(1) ~= total_vehicles(end))
 end
 
 %% Reformat output
-disp('6. Reformat output...')
+disp('7. Reformat output...')
 % to be in the format time, from, to, count (time is the time when vehicle
 % has to depart for destination)
 % this file will be the inputed in amodController
@@ -321,7 +323,7 @@ rebalances_n2n_comb = rebalances_n2n_comb(1:index_c, :);
 clearvars ans column_indx current_line dest_st destX destY facilityFile i j originX originY origin_st row tline X;
 
 %% Save to file
-disp('7. Save rebalancing counts version 1...')
+disp('8. Save rebalancing counts version 1...')
 % the file will serve as an input for the simulation
 filename_out = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
 delimiter = ' ';

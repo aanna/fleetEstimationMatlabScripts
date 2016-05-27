@@ -136,56 +136,85 @@ dlmwrite(fileTOSave_dest, counter_dest, delimiter);
 
 %% number of vehicles in transit at each period of time
 disp('7. Number of vehicles in transit at each period of time...')
-current_period = 1;
 rebalancing_period_start = 0;
 rebalancing_period_end = 15*60; % #mins in seconds
 in_transit = zeros(n_periods, length(f_ids));
+booking_time_interval = floor(booking_time/reb_delta);
+counter_temp = zeros(n_periods, length(f_ids));
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% START TEST
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+iter = 0;
+
+% origin counts
+for i = 1 : length(booking_time_interval)
+    if (booking_time_interval(i) == iter)
+        counter_temp (iter + 1, origin_id(i)) = counter_temp (iter + 1, origin_id(i)) + 1;
+    else
+        counter_temp (iter + 2, origin_id(i)) = counter_temp (iter + 2, origin_id(i)) + 1;
+        iter = iter + 1;
+    end
+end
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% END TEST
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 for i = 1: length(booking_time) %
     
+    % booking time discretized by rebalancing interval
+    
     if (travel_time_(i) > 1) % at least 2 time intervals so the vehicle is missing in the simulation for at least one period
         for j = 1 : (travel_time_(i) - 1) % minus one because we do not count the period when vehicle arrives in destination
-
+            % time interval when the vehicle is in transit to destination
+            % is booking_time + travel_time - last interval when the
+            % vehicle is arriving (is counted as arrival)
+            if (rem(booking_time_interval(i) + j, n_periods) ~= 0)
+                in_transit( rem(booking_time_interval(i) + j, n_periods), dest_id(i)) = in_transit( rem(booking_time_interval(i) + j, n_periods), dest_id(i)) + 1;
+            else
+                in_transit(n_periods, dest_id(i)) = in_transit(n_periods, dest_id(i)) + 1;
+            end
         end
     end
-    
-    
 end
 
 %% sum of arrivals + departures + in_transit at each time step
-disp('8. Sum of arrivals + departures + in_transit at each time step...')
-total_vehicles = zeros(n_periods, 1);
-for i = 1: length(total_vehicles)
-    
-    total_vehicles(i) = sum(in_transit(i,:)) + sum(counter_orig(i,:)) + sum(counter_dest(i,:));
-    
-end
+% This is not known before the optimization !!!!
 
-% check
-disp('9. Checking number of vehicles at every interval...')
-
-for i = 1: length(total_vehicles)
-    
-    if (i < length(total_vehicles))
-
-        if (total_vehicles(i) ~= total_vehicles(i + 1))
-            X = sprintf('NOT EQUAL!: %d != %d', total_vehicles(i), total_vehicles(i + 1));
-            disp(X)
-        else
-            X = sprintf('EQUAL!: %d == %d', total_vehicles(i), total_vehicles(i + 1));
-            disp(X)
-        end
-    else
-
-        if (total_vehicles(i) ~= total_vehicles(1))
-            X = sprintf('NOT EQUAL!: %d != %d', total_vehicles(i), total_vehicles(1));
-            disp(X)
-        else
-            X = sprintf('EQUAL!: %d == %d', total_vehicles(i), total_vehicles(1));
-            disp(X)
-        end
-    end
-end
+% disp('8. Sum of arrivals + departures + in_transit at each time step...')
+% total_vehicles = zeros(n_periods, 1);
+% for i = 1: length(total_vehicles)
+%     
+%     total_vehicles(i) = sum(in_transit(i,:)) + sum(counter_orig(i,:)) + sum(counter_dest(i,:));
+%     
+% end
+% 
+% % check
+% disp('9. Checking number of vehicles at every interval...')
+% 
+% for i = 1: length(total_vehicles)
+%     
+%     if (i < length(total_vehicles))
+% 
+%         if (total_vehicles(i) ~= total_vehicles(i + 1))
+%             X = sprintf('NOT EQUAL!: %d != %d', total_vehicles(i), total_vehicles(i + 1));
+%             disp(X)
+%         else
+%             X = sprintf('EQUAL!: %d == %d', total_vehicles(i), total_vehicles(i + 1));
+%             disp(X)
+%         end
+%     else
+% 
+%         if (total_vehicles(i) ~= total_vehicles(1))
+%             X = sprintf('NOT EQUAL!: %d != %d', total_vehicles(i), total_vehicles(1));
+%             disp(X)
+%         else
+%             X = sprintf('EQUAL!: %d == %d', total_vehicles(i), total_vehicles(1));
+%             disp(X)
+%         end
+%     end
+% end
 
 %% Save to file
 disp('10. Saving to file...')
