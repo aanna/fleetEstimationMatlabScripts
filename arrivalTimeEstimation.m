@@ -47,14 +47,14 @@ stationX = stationsData(:,2);
 stationY = stationsData(:,3);
 
 % nodes file
-disp('3. Import nodes...')
-%nodesFile = sprintf('/Users/katarzyna/Dropbox/matlab/2016-03-Demand_generation/facility_location/input/ecbd_nodes.csv');
-nodesFile = sprintf('/home/kasia/Dropbox/matlab/2016-03-Demand_generation/input/ecbd_nodes.csv');
-nodesData = dlmread(nodesFile, ',', 0, 0);
-
-node_ids = nodesData(:,1);
-nodeX = nodesData(:,2);
-nodeY = nodesData(:,3);
+% disp('3. Import nodes...')
+% %nodesFile = sprintf('/Users/katarzyna/Dropbox/matlab/2016-03-Demand_generation/facility_location/input/ecbd_nodes.csv');
+% nodesFile = sprintf('/home/kasia/Dropbox/matlab/2016-03-Demand_generation/input/ecbd_nodes.csv');
+% nodesData = dlmread(nodesFile, ',', 0, 0);
+% 
+% node_ids = nodesData(:,1);
+% nodeX = nodesData(:,2);
+% nodeY = nodesData(:,3);
 %% for each booking, find distance from origin to destination
 disp('4. Find distance from origins to destinations...')
 O2Ddistance = zeros(length(origX),1); % in m

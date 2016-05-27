@@ -34,7 +34,7 @@ else
     % facility file: facility_id, posX, posY; every line is a new facility
     facilityFile = sprintf('stations_ecbd34.txt');
     % vehicles in transit, matrix n_rebalancing_intervals x nstations
-    intransitFile = sprintf('inTransit900_stations34.txt');
+    intransitFile = sprintf('inTransitReb900Stations34');
     % estimated travel cost for a trip between stations
     travelcostFile = sprintf('RebTimeInSecs34Stations.txt');
     % rebalancing interval in seconds
@@ -58,7 +58,7 @@ dataArray = textscan(fileID, formatSpec, 'Delimiter', delimiter, 'HeaderLines' ,
 fclose(fileID);
 
 GRB_var_name = dataArray{:, 1};
-GRB_time = dataArray{:, 2};
+GRB_reb_interval = dataArray{:, 2};
 GRB_depSt_orSt = dataArray{:, 3}; % depending on thr var_name, i.e., if reb_veh
 %then this is departing station, if available_veh then @ which station
 GRB_arrSt_orSt = dataArray{:, 4}; % same as above
@@ -141,7 +141,8 @@ if (N_stations_orig == N_stations_orig && nrows_orig == nrows_dest)
     nrows = nrows_orig;
     clearvars N_stations_orig N_stations_dest nrows_orig nrows_dest destFile_ destFile originFile_ originFile ;
 else
-    disp('WRONG: N_stations_orig != N_stations_dest or && nrows_orig != nrows_dest')
+    msg = 'WRONG: N_stations_orig != N_stations_dest or && nrows_orig != nrows_dest';
+    error(msg)
 end
 
 %% Import trips data -> in transit counts
@@ -177,7 +178,8 @@ if (N_stations_intr == nstations && nrows == nrows_intr)
     % create a general variable N_stations
     clearvars N_stations_intr nrows_intr intransitFile_ intransitFile;
 else
-    disp('WRONG: N_stations_intr != nstations && nrows == nrows_intr')
+    msg = 'WRONG: N_stations_intr != nstations || nrows != nrows_intr';
+    error(msg)
 end
 
 %% Import travel time between stations
@@ -203,6 +205,15 @@ while ~feof(ttFile_)
     traveltimes(nrows_tt,:) = row_double;
 end
 
+if (issymmetric(traveltimes))
+    disp ('CORRECT! Travel times matrix is symmetric.')
+else
+    msg = 'WRONG!  Travel times matrix is asymmetric.';
+    error(msg)
+end
+
+traveltimes_int = ceil(traveltimes/reb_interval);
+
 %% Sum available vehicles and rebalancing counts
 disp('4. Sum available vehicles and rebalancing counts...')
 
@@ -214,36 +225,67 @@ available_veh_m = zeros(nrows, nstations);
 
 % 2) rebalancing departing counts between stations for all time intervals
 reb_veh = (strcmp(GRB_var_name,'r_tij'));
-reb_dep_counts = zeros(nrows, nstations*nstations);
+reb_dep_counts = zeros(nrows, nstations);
 % rebalancing arriving counts between stations for all time intervals,
 % which is rebalancing_dep + travel time
-reb_arr_counts = zeros(nrows, nstations*nstations);
+reb_arr_counts = zeros(nrows, nstations);
+% reb in transit to station i
+reb_inTransit = zeros(nrows, nstations);
+
 % to retrive and store rebalancing counts
-vec_for_reb = 1:nstations*nstations;
-reb_matrix = transpose(reshape(vec_for_reb, [nstations, nstations]));
+%vec_for_reb = 1:nstations*nstations;
+%reb_matrix = transpose(reshape(vec_for_reb, [nstations, nstations]));
 
 for i =1 : length (GRB_var_name)
     if (idle_veh_ix(i))
-        available_veh_m(GRB_time(i)+1, GRB_depSt_orSt(i)+1) = GRBSOL_quantity(i);
+        available_veh_m(GRB_reb_interval(i)+1, GRB_depSt_orSt(i)+1) = available_veh_m(GRB_reb_interval(i)+1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
     end
     
     if (reb_veh(i))
-        column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
-        reb_dep_counts(GRB_time(i) + 1, column_indx) = GRBSOL_quantity(i);
+     %   column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+
         if (GRBSOL_quantity(i) > 0)
+            reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) = reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
+            
             % shift the counts forward by travel time
-            tt = traveltimes(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
-            arr_time = rem (GRB_time(i) + 1 + tt, nrows*reb_interval);
-            reb_arr_counts(arr_time, column_indx) = GRBSOL_quantity(i);
+            tt_interval = traveltimes_int(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+            
+            % if travel time is longer than 1 interval, then add vehicles
+            % to in_transit_reb
+            % counting the reb_in_transit events
+            if (tt_interval > 1) 
+                for j = 1 : (tt_interval - 1) % minus one because we do not count the period when vehicle arrives in destination
+                    if (rem(GRB_reb_interval(i) + 1 + j, nrows) ~= 0)
+                        reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) = reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) + 1;
+                    else
+                        reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) = reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) + 1;
+                    end
+                end
+            end
+
+            % couting the arrival events
+            if ( rem (GRB_reb_interval(i) + 1 + tt_interval, nrows) ~= 0)
+                arr_time = rem (GRB_reb_interval(i) + 1 + tt_interval, nrows);
+                reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) = reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
+            else
+                reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) = reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
+            end    
         end
     end
+end
+
+% check if reb_arr == reb_dep
+if (isequal(sum(reb_dep_counts(:)),sum(reb_arr_counts(:))))
+    disp('CORRECT! Number of reb_dep and reb_arr are EQUAL');
+else
+    error('WRONG! Number of reb_dep and reb_arr are NOT EQUAL')
 end
 
 % Add travel time to the reb_departure time
 
 %% Find number of rebalancing vehs in transit to destination
 disp('5. Find number of rebalancing vehs in transit to destination...')
-
+% done above
 
 %% Analysis
 disp('6. Check if the number of vehicles is constant over the simulation...')
@@ -251,12 +293,12 @@ disp('6. Check if the number of vehicles is constant over the simulation...')
 total_vehicles = zeros(nrows, 1);
 
 for i = 1 : nrows
-    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:));
+    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:));
+    % total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:)) + sum(reb_inTransit(i,:));
     
     if (i > 1)
         if (total_vehicles(i) ~= total_vehicles(i - 1))
-            X = sprintf('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', i, total_vehicles(i), total_vehicles(i - 1));
-            disp(X)
+            error('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', i, total_vehicles(i), total_vehicles(i - 1))
             %         else
             %             X = sprintf('EQUAL at i = %d!==> %d == %d', i, total_vehicles(i), total_vehicles(i - 1));
             %             disp(X)
@@ -266,8 +308,7 @@ end
 
 % last interval comparison
 if (total_vehicles(1) ~= total_vehicles(end))
-    X = sprintf('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', 1, total_vehicles(1), total_vehicles(end));
-    disp(X)
+    error('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', 1, total_vehicles(1), total_vehicles(end))
     %         else
     %             X = sprintf('EQUAL at i = %d!==> %d == %d', i, total_vehicles(i), total_vehicles(i - 1));
     %             disp(X)
@@ -290,9 +331,9 @@ index_c = 0;
 % version 2 : time, originX, originY, destX, destY
 % version 3 : time, origin, dest, counts (there is no separate line for
 % each trip)
-for i = 1 : length (GRB_time)
+for i = 1 : length (GRB_reb_interval)
     if (reb_veh(i))
-        column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+        %column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
         % find origin station id
         origin_st = f_ids(GRB_depSt_orSt(i)+1);
         dest_st = f_ids(GRB_arrSt_orSt(i)+1);
@@ -301,9 +342,13 @@ for i = 1 : length (GRB_time)
         destX = stationX(GRB_arrSt_orSt(i)+1);
         destY = stationY(GRB_arrSt_orSt(i)+1);
         % time has to be converted to seconds based on rebalancing interval
-        rebtime = (GRB_time(i)+1)*reb_interval;
-        % all rebalancing trips are saved separately so for each count
-        % prodice one trip
+        rebtime = (GRB_reb_interval(i)+1)*reb_interval;
+
+        % last interval is the first
+        if (rebtime == 86400)
+            rebtime = 0;
+        end
+        
         for j = 1 : GRBSOL_quantity(i)
             index = index + 1;
             rebalances_n2n(index, :) = [rebtime; origin_st; dest_st];

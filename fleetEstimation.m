@@ -121,7 +121,7 @@ sum_dest = sum(counter_dest(:));
 if (sum_origins == sum_dest && sum_origins == length(booking_time))
     disp('CORRECT: sum_origins == sum_dest && sum_origins == length(booking_time)')
 else
-    disp('WRONG: sum_origins ~= sum_dest || sum_origins ~= length(booking_time)')
+    error('WRONG: sum_origins ~= sum_dest || sum_origins ~= length(booking_time)')
 end
 
 %% Save to file
@@ -136,32 +136,36 @@ dlmwrite(fileTOSave_dest, counter_dest, delimiter);
 
 %% number of vehicles in transit at each period of time
 disp('7. Number of vehicles in transit at each period of time...')
-rebalancing_period_start = 0;
-rebalancing_period_end = 15*60; % #mins in seconds
 in_transit = zeros(n_periods, length(f_ids));
-booking_time_interval = floor(booking_time/reb_delta);
+booking_time_interval = floor(booking_time/reb_delta) + 1; % ceil because the first interval is 1, not zero
 counter_temp = zeros(n_periods, length(f_ids));
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % START TEST
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-iter = 0;
+iter = 1;
 
 % origin counts
 for i = 1 : length(booking_time_interval)
     if (booking_time_interval(i) == iter)
-        counter_temp (iter + 1, origin_id(i)) = counter_temp (iter + 1, origin_id(i)) + 1;
+        counter_temp (booking_time_interval(i), origin_id(i)) = counter_temp (booking_time_interval(i), origin_id(i)) + 1;
     else
-        counter_temp (iter + 2, origin_id(i)) = counter_temp (iter + 2, origin_id(i)) + 1;
+        counter_temp (booking_time_interval(i), origin_id(i)) = counter_temp (booking_time_interval(i), origin_id(i)) + 1;
         iter = iter + 1;
     end
 end
+
+        if (sum(counter_temp(:)) == sum(counter_orig(:)))
+            disp('CORRECT: sum_origins == counter_temp')
+        else
+            error('WRONG: sum_origins ~= counter_temp')
+        end
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 % END TEST
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-for i = 1: length(booking_time) %
+for i = 1: length(booking_time_interval) %
     
     % booking time discretized by rebalancing interval
     
