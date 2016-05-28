@@ -1,6 +1,6 @@
 close all; clear; clc;
 
-simple_model = false;
+simple_model = true;
 
 % input files:
 if (simple_model)
@@ -8,16 +8,16 @@ if (simple_model)
     gurobi_out = sprintf('/home/kasia/Documents/rebalancing_cpp/rebalancingMethods/rebalancing_offline/rebalancing_solution_simple.sol');
     % counts of origins at each station at each rebalancing interval
     % size: matrix n_rebalancing_intervals x nstations
-    originFile = sprintf('sampleFiles/origCounts3x3.txt');
+    originFile = sprintf('sampleFiles/origCounts3x3TT.txt');
     % destination counts at each station at each rebalancing interval
     % size: matrix n_rebalancing_intervals x nstations
-    destFile = sprintf('sampleFiles/destCounts3x3.txt');
+    destFile = sprintf('sampleFiles/destCounts3x3TT.txt');
     % facility file: facility_id, posX, posY; every line is a new facility
     facilityFile = sprintf('sampleFiles/stationsXY.txt');
     % vehicles in transit, matrix n_rebalancing_intervals x nstations
-    intransitFile = sprintf('sampleFiles/inTransit3x3.txt');
+    intransitFile = sprintf('sampleFiles/inTransit3x3TT.txt');
     % estimated travel cost for a trip between stations
-    travelcostFile = sprintf('sampleFiles/costM3x3.txt');
+    travelcostFile = sprintf('sampleFiles/costM3x3TT.txt');
     % rebalancing interval in seconds
     reb_interval = 1; % 1 for sample files
     
@@ -116,7 +116,7 @@ N_stations_dest = length(find(tline==' ')) + 1;
 
 % Keep track of the current state outside the loop:
 nrows_dest = 0;     % Number of rows in current run
-dest_counts = zeros(1000, N_stations_dest);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
+cust_arr_counts = zeros(1000, N_stations_dest);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
 % reopen the file
 destFile_ = fopen(destFile);
 
@@ -127,11 +127,11 @@ while ~feof(destFile_)
     row_double = cell2mat(row)';
     % Append the row to the current run data
     nrows_dest = nrows_dest + 1;
-    dest_counts(nrows_dest,:) = row_double;
+    cust_arr_counts(nrows_dest,:) = row_double;
 end
 
 % Remove all rows from nrows until the end of matrix
-dest_counts = dest_counts(1:nrows_dest,:);
+cust_arr_counts = cust_arr_counts(1:nrows_dest,:);
 
 % check if N_stations_orig == N_stations_dest
 if (N_stations_orig == N_stations_orig && nrows_orig == nrows_dest)
@@ -256,9 +256,9 @@ for i =1 : length (GRB_var_name)
             if (tt_interval > 1) 
                 for j = 1 : (tt_interval - 1) % minus one because we do not count the period when vehicle arrives in destination
                     if (rem(GRB_reb_interval(i) + 1 + j, nrows) ~= 0)
-                        reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) = reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) + 1;
+                        reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) = reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
                     else
-                        reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) = reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) + 1;
+                        reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) = reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
                     end
                 end
             end
@@ -293,8 +293,8 @@ disp('6. Check if the number of vehicles is constant over the simulation...')
 total_vehicles = zeros(nrows, 1);
 
 for i = 1 : nrows
-    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:));
-    % total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(dest_counts(i,:)) + sum(reb_arr_counts(i,:)) + sum(reb_inTransit(i,:));
+    % total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(cust_arr_counts(i,:)) + sum(reb_arr_counts(i,:));
+    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(cust_arr_counts(i,:)) + sum(reb_arr_counts(i,:)) + sum(reb_inTransit(i,:)); %
     
     if (i > 1)
         if (total_vehicles(i) ~= total_vehicles(i - 1))
@@ -309,9 +309,8 @@ end
 % last interval comparison
 if (total_vehicles(1) ~= total_vehicles(end))
     error('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', 1, total_vehicles(1), total_vehicles(end))
-    %         else
-    %             X = sprintf('EQUAL at i = %d!==> %d == %d', i, total_vehicles(i), total_vehicles(i - 1));
-    %             disp(X)
+            else
+                disp('CORRECT! EQUAL number of vehicles in simulation!')
 end
 
 %% Reformat output
