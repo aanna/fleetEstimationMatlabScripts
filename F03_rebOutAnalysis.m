@@ -1,6 +1,10 @@
 close all; clear; clc;
 
-simple_model = true;
+simple_model = false;
+% output file in the format: time, node_id, node_id, number_of_trips
+% otherwise, we list the trips one by one
+% or based on x and y
+output_n2n_c = true;
 
 % input files:
 if (simple_model)
@@ -242,8 +246,8 @@ for i =1 : length (GRB_var_name)
     end
     
     if (reb_veh(i))
-     %   column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
-
+        %   column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+        
         if (GRBSOL_quantity(i) > 0)
             reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) = reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
             
@@ -253,7 +257,7 @@ for i =1 : length (GRB_var_name)
             % if travel time is longer than 1 interval, then add vehicles
             % to in_transit_reb
             % counting the reb_in_transit events
-            if (tt_interval > 1) 
+            if (tt_interval > 1)
                 for j = 1 : (tt_interval - 1) % minus one because we do not count the period when vehicle arrives in destination
                     if (rem(GRB_reb_interval(i) + 1 + j, nrows) ~= 0)
                         reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) = reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
@@ -262,14 +266,14 @@ for i =1 : length (GRB_var_name)
                     end
                 end
             end
-
+            
             % couting the arrival events
             if ( rem (GRB_reb_interval(i) + 1 + tt_interval, nrows) ~= 0)
                 arr_time = rem (GRB_reb_interval(i) + 1 + tt_interval, nrows);
                 reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) = reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
             else
                 reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) = reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
-            end    
+            end
         end
     end
 end
@@ -280,6 +284,8 @@ if (isequal(sum(reb_dep_counts(:)),sum(reb_arr_counts(:))))
 else
     error('WRONG! Number of reb_dep and reb_arr are NOT EQUAL')
 end
+
+reb_arr_total = sum(reb_arr_counts(:));
 
 % Add travel time to the reb_departure time
 
@@ -309,8 +315,8 @@ end
 % last interval comparison
 if (total_vehicles(1) ~= total_vehicles(end))
     error('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', 1, total_vehicles(1), total_vehicles(end))
-            else
-                disp('CORRECT! EQUAL number of vehicles in simulation!')
+else
+    disp('CORRECT! EQUAL number of vehicles in simulation!')
 end
 
 %% Reformat output
@@ -319,12 +325,16 @@ disp('7. Reformat output...')
 % has to depart for destination)
 % this file will be the inputed in amodController
 
-rebalances_n2n = zeros(100000, 3); % preallocated space, line: time, node, node
-rebalances_xy2xy = zeros(100000, 5); % preallocated space, line: time, originX, originY, destX, destY
-rebalances_xy2xy_comb = zeros(100000, 6); % preallocated space, line: time, originX, originY, destX, destY, count
-rebalances_n2n_comb = zeros(100000, 4); % preallocated space, line: time, node, node, count
-index = 0;
-index_c = 0;
+if (~output_n2n_c)
+    rebalances_n2n = zeros(100000, 3); % preallocated space, line: time, node, node
+    rebalances_xy2xy = zeros(100000, 5); % preallocated space, line: time, originX, originY, destX, destY
+    rebalances_xy2xy_comb = zeros(100000, 6); % preallocated space, line: time, originX, originY, destX, destY, count
+    index = 0;
+else
+    rebalances_n2n_comb = zeros(100000, 4); % preallocated space, line: time, node, node, count
+    index_c = 0;
+end
+
 % check for all rebalancing variables in the optimization output and write
 % a new line for each rebalancing trip: time, origin, dest,
 % version 2 : time, originX, originY, destX, destY
@@ -332,45 +342,65 @@ index_c = 0;
 % each trip)
 for i = 1 : length (GRB_reb_interval)
     if (reb_veh(i))
-        %column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
-        % find origin station id
-        origin_st = f_ids(GRB_depSt_orSt(i)+1);
-        dest_st = f_ids(GRB_arrSt_orSt(i)+1);
-        originX = stationX(GRB_depSt_orSt(i)+1);
-        originY = stationY(GRB_depSt_orSt(i)+1);
-        destX = stationX(GRB_arrSt_orSt(i)+1);
-        destY = stationY(GRB_arrSt_orSt(i)+1);
-        % time has to be converted to seconds based on rebalancing interval
-        rebtime = (GRB_reb_interval(i)+1)*reb_interval;
-
-        % last interval is the first
-        if (rebtime == 86400)
-            rebtime = 0;
+        if (GRBSOL_quantity(i) > 0)
+            index_c = index_c + 1;
+            %column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
+            % find origin station id
+            if (~output_n2n_c)
+                originX = stationX(GRB_depSt_orSt(i)+1);
+                originY = stationY(GRB_depSt_orSt(i)+1);
+                destX = stationX(GRB_arrSt_orSt(i)+1);
+                destY = stationY(GRB_arrSt_orSt(i)+1);
+            end
+            origin_st = f_ids(GRB_depSt_orSt(i)+1);
+            dest_st = f_ids(GRB_arrSt_orSt(i)+1);
+            
+            % time has to be converted to seconds based on rebalancing interval
+            % last interval is the first
+            rebtime = rem((GRB_reb_interval(i)+1)*reb_interval, 86400);
+            
+            
+            
+            if (~output_n2n_c)
+                for j = 1 : GRBSOL_quantity(i)
+                    index = index + 1;
+                    rebalances_n2n(index, :) = [rebtime; origin_st; dest_st];
+                    rebalances_xy2xy(index, :) = [rebtime; originX; originY; destX; destY];
+                end
+                rebalances_xy2xy_comb(index_c, :) = [rebtime; originX; originY; destX; destY; GRBSOL_quantity(i)];
+            else
+                rebalances_n2n_comb(index_c, :) = [rebtime; origin_st; dest_st; int32(GRBSOL_quantity(i))];
+            end
         end
-        
-        for j = 1 : GRBSOL_quantity(i)
-            index = index + 1;
-            rebalances_n2n(index, :) = [rebtime; origin_st; dest_st];
-            rebalances_xy2xy(index, :) = [rebtime; originX; originY; destX; destY];
-        end
-        index_c = index_c + 1;
-        rebalances_xy2xy_comb(index_c, :) = [rebtime; originX; originY; destX; destY; GRBSOL_quantity(i)];
-        rebalances_n2n_comb(index_c, :) = [rebtime; origin_st; dest_st; GRBSOL_quantity(i)];
     end
 end
 
-rebalances_n2n = rebalances_n2n(1:index, :);
-rebalances_xy2xy = rebalances_xy2xy(1:index, :);
-rebalances_xy2xy_comb = rebalances_xy2xy_comb(1:index_c, :);
-rebalances_n2n_comb = rebalances_n2n_comb(1:index_c, :);
+if (~output_n2n_c)
+    rebalances_n2n = rebalances_n2n(1:index, :);
+    rebalances_xy2xy = rebalances_xy2xy(1:index, :);
+    rebalances_xy2xy_comb = rebalances_xy2xy_comb(1:index_c, :);
+else
+   rebalances_n2n_comb = rebalances_n2n_comb(1:index_c, :); 
+   rebalances_n2n_comb_sorted = sortrows (rebalances_n2n_comb, 1);
+end
 
-clearvars ans column_indx current_line dest_st destX destY facilityFile i j originX originY origin_st row tline X;
+% clearvars ans column_indx current_line dest_st destX destY facilityFile i j originX originY origin_st row tline X;
 
 %% Save to file
 disp('8. Save rebalancing counts version 1...')
 % the file will serve as an input for the simulation
-filename_out = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
-delimiter = ' ';
-dlmwrite(filename_out, rebalances_n2n_comb,  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
+if (simple_model)
+    filename_out = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
+else
+    filename_out = sprintf('rebalancingCounts_per%d_st%d.txt', nrows, nstations);
+end
+%delimiter = ' ';
+%dlmwrite(filename_out, int32(rebalances_n2n_comb_sorted),  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
+
+out_f = fopen(filename_out,'w');
+for i = 1 : length (rebalances_n2n_comb_sorted)
+   fprintf(out_f,'%0u %0u %0u %0u\n', rebalances_n2n_comb_sorted(i,1), rebalances_n2n_comb_sorted(i,2), rebalances_n2n_comb_sorted(i,3), rebalances_n2n_comb_sorted(i,4));
+end
+fclose(out_f);
 
 disp('All done.')
