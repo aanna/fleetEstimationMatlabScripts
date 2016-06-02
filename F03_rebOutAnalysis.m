@@ -1,6 +1,6 @@
 close all; clear; clc;
 
-simple_model = false;
+simple_model = true;
 % output file in the format: time, node_id, node_id, number_of_trips
 % otherwise, we list the trips one by one
 % or based on x and y
@@ -93,7 +93,7 @@ N_stations_orig = length(find(tline==' ')) + 1;
 
 % Keep track of the current state outside the loop:
 nrows_orig = 0;     % Number of rows in current run
-origin_counts = zeros(1000, N_stations_orig);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
+cust_dep_counts = zeros(1000, N_stations_orig);  % Prealocated for speed improvement, later it will be trunckated to the correct number of rows
 % reopen the file
 originFile_ = fopen(originFile);
 
@@ -104,11 +104,11 @@ while ~feof(originFile_)
     row_double = cell2mat(row)';
     % Append the row to the current run data
     nrows_orig = nrows_orig + 1;
-    origin_counts(nrows_orig,:) = row_double;
+    cust_dep_counts(nrows_orig,:) = row_double;
 end
 
 % Remove all rows from nrows until the end of matrix
-origin_counts = origin_counts(1:nrows_orig,:);
+cust_dep_counts = cust_dep_counts(1:nrows_orig,:);
 
 %% Import trips data -> destination counts
 % dest_counts; the same procedure as for origin_counts
@@ -358,9 +358,7 @@ for i = 1 : length (GRB_reb_interval)
             % time has to be converted to seconds based on rebalancing interval
             % last interval is the first
             rebtime = rem((GRB_reb_interval(i)+1)*reb_interval, 86400);
-            
-            
-            
+     
             if (~output_n2n_c)
                 for j = 1 : GRBSOL_quantity(i)
                     index = index + 1;
@@ -398,7 +396,7 @@ end
 %dlmwrite(filename_out, int32(rebalances_n2n_comb_sorted),  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
 
 out_f = fopen(filename_out,'w');
-for i = 1 : length (rebalances_n2n_comb_sorted)
+for i = 1 : length (rebalances_n2n_comb_sorted(:,1))
    fprintf(out_f,'%0u %0u %0u %0u\n', rebalances_n2n_comb_sorted(i,1), rebalances_n2n_comb_sorted(i,2), rebalances_n2n_comb_sorted(i,3), rebalances_n2n_comb_sorted(i,4));
 end
 fclose(out_f);
