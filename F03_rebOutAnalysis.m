@@ -1,6 +1,6 @@
 close all; clear; clc;
 
-simple_model = true;
+simple_model = false;
 % output file in the format: time, node_id, node_id, number_of_trips
 % otherwise, we list the trips one by one
 % or based on x and y
@@ -317,6 +317,7 @@ if (total_vehicles(1) ~= total_vehicles(end))
     error('Number of vehicles NOT EQUAL at i = %d!==> %d != %d', 1, total_vehicles(1), total_vehicles(end))
 else
     disp('CORRECT! EQUAL number of vehicles in simulation!')
+    disp (total_vehicles(1))
 end
 
 %% Reformat output
