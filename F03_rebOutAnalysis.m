@@ -242,14 +242,16 @@ reb_inTransit = zeros(nrows, nstations);
 
 for i =1 : length (GRB_var_name)
     if (idle_veh_ix(i))
-        available_veh_m(GRB_reb_interval(i)+1, GRB_depSt_orSt(i)+1) = available_veh_m(GRB_reb_interval(i)+1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
+        available_veh_m(GRB_reb_interval(i)+1, GRB_depSt_orSt(i)+1) = ...
+            available_veh_m(GRB_reb_interval(i)+1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
     end
     
     if (reb_veh(i))
         %   column_indx = reb_matrix(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
         
         if (GRBSOL_quantity(i) > 0)
-            reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) = reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
+            reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) = ...
+                reb_dep_counts(GRB_reb_interval(i) + 1, GRB_depSt_orSt(i)+1) + GRBSOL_quantity(i);
             
             % shift the counts forward by travel time
             tt_interval = traveltimes_int(GRB_depSt_orSt(i)+1, GRB_arrSt_orSt(i)+1);
@@ -260,9 +262,11 @@ for i =1 : length (GRB_var_name)
             if (tt_interval > 1)
                 for j = 1 : (tt_interval - 1) % minus one because we do not count the period when vehicle arrives in destination
                     if (rem(GRB_reb_interval(i) + 1 + j, nrows) ~= 0)
-                        reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) = reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
+                        reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) = ...
+                            reb_inTransit( rem(GRB_reb_interval(i) + 1 + j, nrows), GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
                     else
-                        reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) = reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
+                        reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) = ...
+                            reb_inTransit(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
                     end
                 end
             end
@@ -270,9 +274,11 @@ for i =1 : length (GRB_var_name)
             % couting the arrival events
             if ( rem (GRB_reb_interval(i) + 1 + tt_interval, nrows) ~= 0)
                 arr_time = rem (GRB_reb_interval(i) + 1 + tt_interval, nrows);
-                reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) = reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
+                reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) = ...
+                    reb_arr_counts(arr_time, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
             else
-                reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) = reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
+                reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) = ...
+                    reb_arr_counts(nrows, GRB_arrSt_orSt(i)+1) + GRBSOL_quantity(i);
             end
         end
     end
@@ -300,7 +306,8 @@ total_vehicles = zeros(nrows, 1);
 
 for i = 1 : nrows
     % total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(cust_arr_counts(i,:)) + sum(reb_arr_counts(i,:));
-    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) + sum(cust_arr_counts(i,:)) + sum(reb_arr_counts(i,:)) + sum(reb_inTransit(i,:)); %
+    total_vehicles(i,1) = sum(available_veh_m(i,:)) + sum(intransit_counts(i,:)) ...
+        + sum(cust_arr_counts(i,:)) + sum(reb_arr_counts(i,:)) + sum(reb_inTransit(i,:)); %
     
     if (i > 1)
         if (total_vehicles(i) ~= total_vehicles(i - 1))
@@ -389,16 +396,60 @@ end
 disp('8. Save rebalancing counts version 1...')
 % the file will serve as an input for the simulation
 if (simple_model)
-    filename_out = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
+    filename_out_reb_count = sprintf('rebalancingCounts_sample_per%d_st%d.txt', nrows, nstations);
 else
-    filename_out = sprintf('rebalancingCounts_per%d_st%d.txt', nrows, nstations);
+    filename_out_reb_count = sprintf('rebalancingCounts_per%d_st%d.txt', nrows, nstations);
 end
 %delimiter = ' ';
 %dlmwrite(filename_out, int32(rebalances_n2n_comb_sorted),  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
 
-out_f = fopen(filename_out,'w');
+out_f = fopen(filename_out_reb_count,'w');
 for i = 1 : length (rebalances_n2n_comb_sorted(:,1))
-   fprintf(out_f,'%0u %0u %0u %0u\n', rebalances_n2n_comb_sorted(i,1), rebalances_n2n_comb_sorted(i,2), rebalances_n2n_comb_sorted(i,3), rebalances_n2n_comb_sorted(i,4));
+   fprintf(out_f,'%0u %0u %0u %0u\n', rebalances_n2n_comb_sorted(i,1), ...
+       rebalances_n2n_comb_sorted(i,2), rebalances_n2n_comb_sorted(i,3), rebalances_n2n_comb_sorted(i,4));
+end
+fclose(out_f);
+
+%% N of vehicles at each station at the beginning
+disp('9. N of vehicles at each station at the beginning...')
+
+%init_vehicles = zeros(nstations,1);
+available_veh_init = available_veh_m(1,:);
+couts_arr_init = cust_arr_counts(1,:) + reb_arr_counts(1,:) + intransit_counts(1,:) + reb_inTransit(1,:);
+
+init_vehicles = available_veh_init' + couts_arr_init';
+
+if (sum(init_vehicles) ~= total_vehicles(1))
+    error('Number of vehicles at init NOT EQUAL')
+else
+    disp('CORRECT! Number of vehicles at init correct')
+end
+
+filename_out_init = sprintf('init_veh%d_st%d.txt', total_vehicles(1), nstations);
+
+out_f_init = fopen(filename_out_init,'w');
+for i = 1 : nstations
+   fprintf(out_f_init,'%0u %0u\n', f_ids(i), init_vehicles(i));
+end
+fclose(out_f_init);
+
+%% Rebalancing counts minus first interval
+disp('10. Save rebalancing counts version 2...')
+
+if (simple_model)
+    filename_out_reb_count2 = sprintf('rebalancingCounts_withInit_sample_per%d_st%d.txt', nrows, nstations);
+else
+    filename_out_reb_count2 = sprintf('rebalancingCounts_withInit_per%d_st%d.txt', nrows, nstations);
+end
+%delimiter = ' ';
+%dlmwrite(filename_out, int32(rebalances_n2n_comb_sorted),  delimiter); % or rebalances_xy2xy_comb or rebalances_xy2xy
+
+out_f = fopen(filename_out_reb_count2,'w');
+for i = 1 : length (rebalances_n2n_comb_sorted(:,1))
+    if (rebalances_n2n_comb_sorted(i,1) ~= 0)
+        fprintf(out_f,'%0u %0u %0u %0u\n', rebalances_n2n_comb_sorted(i,1), ...
+            rebalances_n2n_comb_sorted(i,2), rebalances_n2n_comb_sorted(i,3), rebalances_n2n_comb_sorted(i,4));
+    end
 end
 fclose(out_f);
 
